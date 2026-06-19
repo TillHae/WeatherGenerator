@@ -225,6 +225,10 @@ def clean_df(df, columns: list[str] | None):
         # Remove all rows where all columns are null
         df = df.filter(~pl.all_horizontal(pl.col(c).is_null() for c in columns))
 
+    # Sort by num_samples so that continued runs are plotted correctly.
+    if "num_samples" in df.columns:
+        df = df.sort("num_samples")
+
     return df
 
 
