@@ -399,6 +399,10 @@ class Trainer(TrainerBase):
                 )
             self.save_model(mini_epoch)
 
+            max_budget = self.training_cfg.get("max_compute_budget_l6_steps", None)
+            if max_budget is not None and self.cf.general.cumulative_compute_l6_steps >= max_budget:
+                break
+
         # log final model
         self.save_model(self.training_cfg.num_mini_epochs)
 
@@ -557,7 +561,18 @@ class Trainer(TrainerBase):
             if bidx % self.train_logging.checkpoint == 0 and bidx > 0:
                 self.save_model(-1)
 
+            # update compute tracker
+            batch_size_total = self.get_batch_size_total(self.batch_size_per_gpu)
+            compute_cost = batch_size_total * (4 ** self.cf.healpix_level) / (4 ** 6)
+            self.cf.general.cumulative_compute_l6_steps += compute_cost
+
             self.cf.general.istep += 1
+
+            max_budget = self.training_cfg.get("max_compute_budget_l6_steps", None)
+            if max_budget is not None and self.cf.general.cumulative_compute_l6_steps >= max_budget:
+                if is_root():
+                    logger.info(f"Compute budget reached ({self.cf.general.cumulative_compute_l6_steps} >= {max_budget}). Stopping training.")
+                break
 
         self.dataset.advance()
 
