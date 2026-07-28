@@ -1,0 +1,14 @@
+healpix_level: 5
+rope_2D: False
+
+# Data streams
+streams_directory: "./config/streams/era5_1deg/"
+zarr_store: "zip"
+
+training_config:
+  num_mini_epochs: 32
+  
+wgtags:
+  exp: "coarse_to_fine_multistage"
+  stage: "L5"
+  issue: null
