@@ -6,7 +6,8 @@ streams_directory: "./config/streams/era5_1deg/"
 zarr_store: "zip"
 
 training_config:
-  num_mini_epochs: 32
+  num_mini_epochs: 8
+  max_compute_budget_l6_steps: 512
   
 wgtags:
   exp: "coarse_to_fine_multistage"

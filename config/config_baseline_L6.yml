@@ -6,8 +6,8 @@ streams_directory: "./config/streams/era5_1deg/" # Update if you have a 0.25deg 
 zarr_store: "zip"
 
 training_config:
-  num_mini_epochs: 32
-  max_compute_budget_l6_steps: 131072
+  num_mini_epochs: 8
+  max_compute_budget_l6_steps: 32768
   
 wgtags:
   exp: "coarse_to_fine_baseline"
