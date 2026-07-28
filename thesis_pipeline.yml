@@ -1,6 +1,6 @@
 stages:
   # --- 1. Baseline Run (Level 6) ---
-  - name: baseline_l6
+  - name: baselineL6
     stage: train
     config_files:
       - config/config_baseline_L6.yml
@@ -9,7 +9,7 @@ stages:
       - "--time=02:30:00"  # ~90 min expected runtime + buffer
 
   # --- 2. Multi-Stage: Level 3 ---
-  - name: multistage_l3
+  - name: multistageL3
     stage: train
     config_files:
       - config/config_multistage_L3.yml
@@ -18,9 +18,9 @@ stages:
       - "--time=00:30:00"  # ~2 min expected runtime + buffer
 
   # --- 3. Multi-Stage: Level 4 ---
-  - name: multistage_l4
+  - name: multistageL4
     stage: train
-    from_run_id: STAGE.multistage_l3
+    from_run_id: STAGE.multistageL3
     config_files:
       - config/config_multistage_L4.yml
     nodes: 1
@@ -28,9 +28,9 @@ stages:
       - "--time=00:30:00"  # ~5 min expected runtime + buffer
 
   # --- 4. Multi-Stage: Level 5 ---
-  - name: multistage_l5
+  - name: multistageL5
     stage: train
-    from_run_id: STAGE.multistage_l4
+    from_run_id: STAGE.multistageL4
     config_files:
       - config/config_multistage_L5.yml
     nodes: 1
@@ -38,9 +38,9 @@ stages:
       - "--time=01:00:00"  # ~17 min expected runtime + buffer
 
   # --- 5. Multi-Stage: Level 6 (Target) ---
-  - name: multistage_l6
+  - name: multistageL6
     stage: train
-    from_run_id: STAGE.multistage_l5
+    from_run_id: STAGE.multistageL5
     config_files:
       - config/config_multistage_L6.yml
     nodes: 1
