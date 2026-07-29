@@ -1,8 +1,10 @@
 # Inference configuration for thesis evaluation.
 # Enables output writing so the evaluation stage has zarr files to score.
+# Limits samples to 50 to avoid running unnecessary inference iterations.
 
 validation_config:
+  samples_per_mini_epoch: 50  # Only iterate over 50 samples total
   output:
-    num_samples: 50   # Write 50 samples to disk for scoring
+    num_samples: 50   # Write all 50 samples to disk for scoring
     normalized_samples: False
     streams: null     # Write all streams
