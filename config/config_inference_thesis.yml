@@ -1,0 +1,8 @@
+# Inference configuration for thesis evaluation.
+# Enables output writing so the evaluation stage has zarr files to score.
+
+validation_config:
+  output:
+    num_samples: 50   # Write 50 samples to disk for scoring
+    normalized_samples: False
+    streams: null     # Write all streams
