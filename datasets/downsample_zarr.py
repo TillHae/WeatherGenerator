@@ -105,22 +105,26 @@ def downsample(in_zarr_path, out_zarr_path, res_deg, freq_hours=6):
     
     batch_size = chunks[0]
     print(f"Processing data in batches of {batch_size} dates...")
+    import concurrent.futures
     
-    for start_idx in tqdm(range(0, num_dates, batch_size)):
+    def process_batch(start_idx):
         end_idx = min(start_idx + batch_size, num_dates)
-        
-        # Get the actual indices in the original dataset for this batch
         batch_old_indices = valid_indices[start_idx:end_idx]
         
-        # Read each date sequentially to avoid giant fancy indexing on Zarr
         batch_mapped = np.zeros((end_idx - start_idx, shape[1], shape[2], shape[3]), dtype=old_data.dtype)
         for i, old_idx in enumerate(batch_old_indices):
-            # old_data[old_idx] is shape (ensemble, variables, old_nodes)
             date_data = old_data[old_idx, ...] 
-            # Nearest neighbor mapping
             batch_mapped[i, ...] = date_data[..., indices]
             
         new_data[start_idx:end_idx, ...] = batch_mapped
+
+    print(f"Processing data in batches of {batch_size} dates using 16 threads...")
+    
+    with concurrent.futures.ThreadPoolExecutor(max_workers=16) as executor:
+        futures = [executor.submit(process_batch, s) for s in range(0, num_dates, batch_size)]
+        
+        for future in tqdm(concurrent.futures.as_completed(futures), total=len(futures)):
+            future.result()
 
     print(f"Successfully created {out_zarr_path}!")
 
