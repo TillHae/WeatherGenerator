@@ -1,0 +1,29 @@
+# Anemoi-datasets recipe: ERA5 at O24 (~4°) for WeatherGenerator curriculum L4 training
+#
+# Creates a lower-resolution version of the existing O96 ERA5 dataset by regridding to O24.
+# O24 has ~4° resolution, matching HEALPix level 4 (nside=16, ~3.7°).
+#
+# Usage (on JUPITER):
+#   anemoi-datasets create datasets/recipe_era5_o24.yml \
+#     /e/scratch/weatherai/hauer1/era5-o24-1979-2024-6h.zarr
+
+description: ERA5 O24 (~4deg) for WeatherGenerator coarse-to-fine curriculum - L4 stage
+
+dates:
+  start: "1979-01-01T00:00:00"
+  end: "2024-12-31T18:00:00"
+  frequency: 6h
+
+input:
+  dataset:
+    dataset: /e/data1/slmet/ml_training/aifs-ea-an-oper-0001-mars-o96-1979-2024-1h-v3-with-era51.zarr
+    frequency: 6h
+  filters:
+    - regrid:
+        target_grid: o24
+
+output:
+  resolution: o24
+  chunking:
+    dates: 1
+    variables: -1

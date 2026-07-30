@@ -2,8 +2,9 @@ healpix_level: 5
 rope_2D: False
 
 # Data streams
-streams_directory: "./config/streams/era5_1deg/"
+streams_directory: "./config/streams/era5_2deg/"
 zarr_store: "zip"
+data_path_anemoi: "/e/scratch/weatherai/hauer1"
 
 training_config:
   num_mini_epochs: 20

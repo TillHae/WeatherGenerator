@@ -1,0 +1,30 @@
+# Anemoi-datasets recipe: ERA5 at O48 (~2°) for WeatherGenerator curriculum L5 training
+#
+# Creates a lower-resolution version of the existing O96 ERA5 dataset by regridding to O48.
+# O48 has ~2° resolution, matching HEALPix level 5 (nside=32, ~1.8°).
+#
+# Usage (on JUPITER, after creating the output dir):
+#   mkdir -p /e/scratch/weatherai/hauer1
+#   anemoi-datasets create datasets/recipe_era5_o48.yml \
+#     /e/scratch/weatherai/hauer1/era5-o48-1979-2024-6h.zarr
+
+description: ERA5 O48 (~2deg) for WeatherGenerator coarse-to-fine curriculum - L5 stage
+
+dates:
+  start: "1979-01-01T00:00:00"
+  end: "2024-12-31T18:00:00"
+  frequency: 6h
+
+input:
+  dataset:
+    dataset: /e/data1/slmet/ml_training/aifs-ea-an-oper-0001-mars-o96-1979-2024-1h-v3-with-era51.zarr
+    frequency: 6h
+  filters:
+    - regrid:
+        target_grid: o48
+
+output:
+  resolution: o48
+  chunking:
+    dates: 1
+    variables: -1
