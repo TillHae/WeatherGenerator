@@ -21,7 +21,7 @@ def downsample(in_zarr_path, out_zarr_path, res_deg, freq_hours=6):
         dates_pd = pd.to_datetime(old_dates) # works for np.datetime64 too
         
     # Find indices where hour is a multiple of freq_hours
-    valid_indices = np.where(dates_pd.dt.hour % freq_hours == 0)[0]
+    valid_indices = np.where(dates_pd.hour % freq_hours == 0)[0]
     new_dates = old_dates[valid_indices]
     num_dates = len(new_dates)
     print(f"Filtered dates from {len(old_dates)} (1h) to {num_dates} ({freq_hours}h).")
