@@ -15,10 +15,10 @@ dates:
   frequency: 6h
 
 input:
-  dataset:
-    dataset: /e/data1/slmet/ml_training/aifs-ea-an-oper-0001-mars-o96-1979-2024-1h-v3-with-era51.zarr
-    frequency: 6h
-  filters:
+  pipe:
+    - dataset:
+        dataset: /e/data1/slmet/ml_training/aifs-ea-an-oper-0001-mars-o96-1979-2024-1h-v3-with-era51.zarr
+        frequency: 6h
     - regrid:
         target_grid: o24
 
