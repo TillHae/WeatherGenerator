@@ -16,7 +16,8 @@ dates:
 
 input:
   pipe:
-    - anemoi-dataset: /e/data1/slmet/ml_training/aifs-ea-an-oper-0001-mars-o96-1979-2024-1h-v3-with-era51.zarr
+    - anemoi-dataset:
+        dataset: /e/data1/slmet/ml_training/aifs-ea-an-oper-0001-mars-o96-1979-2024-1h-v3-with-era51.zarr
     - regrid:
         target_grid: o24
 
