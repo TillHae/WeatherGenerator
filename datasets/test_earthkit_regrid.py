@@ -1,6 +1,7 @@
 import zarr
 import xarray as xr
 import numpy as np
+import traceback
 
 def test_earthkit_regrid():
     try:
@@ -18,13 +19,22 @@ def test_earthkit_regrid():
     data = ds['data'][:1, :1, :]
     print(f"Data shape: {data.shape}")
     
-    # Try regridding
-    print("Testing earthkit regrid from O96 to [8, 8]...")
-    try:
-        out = interpolate(data, in_grid="O96", out_grid=[8, 8], method="linear")
-        print(f"Success! Output shape: {out.shape}")
-    except Exception as e:
-        print(f"Failed: {e}")
+    attempts = [
+        ({"grid": "O96"}, {"grid": [8, 8]}),
+        ("O96", {"grid": [8, 8]}),
+        ({"grid": "O96"}, [8, 8]),
+        ("O96", [8, 8])
+    ]
+    
+    for in_g, out_g in attempts:
+        print(f"\n--- Testing in_grid={in_g}, out_grid={out_g} ---")
+        try:
+            out = interpolate(data, in_grid=in_g, out_grid=out_g, method="linear")
+            print(f"Success! Output shape: {out.shape}")
+            break
+        except Exception as e:
+            print(f"Failed: {e}")
+            # traceback.print_exc()
 
 if __name__ == "__main__":
     test_earthkit_regrid()
