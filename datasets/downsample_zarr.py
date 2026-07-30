@@ -59,8 +59,7 @@ def downsample(in_zarr_path, out_zarr_path, res_deg, freq_hours=6):
     
     # 4. Create new Zarr store
     print(f"Creating new Zarr store at {out_zarr_path}...")
-    store = zarr.DirectoryStore(out_zarr_path)
-    out_group = zarr.group(store=store, overwrite=True)
+    out_group = zarr.open_group(out_zarr_path, mode='w')
     
     # Copy attributes
     out_group.attrs.update(in_group.attrs)
