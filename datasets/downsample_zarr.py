@@ -72,14 +72,14 @@ def downsample(in_zarr_path, out_zarr_path, res_deg, freq_hours=6):
             continue
         print(f"Copying array {key}...")
         arr = in_group[key]
-        out_group.create_array(key, shape=arr.shape, data=arr[:], chunks=arr.chunks, dtype=arr.dtype, compressor=arr.compressor)
+        out_group.create_array(key, data=arr[:], chunks=arr.chunks, dtype=arr.dtype, compressor=arr.compressor)
         out_group[key].attrs.update(arr.attrs)
         
     # Write new grid and dates
     print("Writing new latitudes, longitudes, and dates...")
-    out_group.create_array('latitudes', shape=(new_nodes,), data=new_lats, chunks=(new_nodes,), dtype=np.float32)
-    out_group.create_array('longitudes', shape=(new_nodes,), data=new_lons, chunks=(new_nodes,), dtype=np.float32)
-    out_group.create_array('dates', shape=(num_dates,), data=new_dates, chunks=(num_dates,), dtype=in_group['dates'].dtype)
+    out_group.create_array('latitudes', data=new_lats, chunks=(new_nodes,), dtype=np.float32)
+    out_group.create_array('longitudes', data=new_lons, chunks=(new_nodes,), dtype=np.float32)
+    out_group.create_array('dates', data=new_dates, chunks=(num_dates,), dtype=in_group['dates'].dtype)
     out_group['dates'].attrs.update(in_group['dates'].attrs)
     
     # 5. Copy and downsample data
