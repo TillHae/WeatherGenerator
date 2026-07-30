@@ -40,8 +40,6 @@ default_streams:
 run_ids:
   n14mjcpx:
     label: "Baseline (direct L6)"
-    results_base_dir: "./results/"
 
   wuxincvz:
     label: "Multi-Stage Curriculum (L3->L6)"
-    results_base_dir: "./results/"
