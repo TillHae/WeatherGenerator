@@ -21,10 +21,10 @@ input:
         dataset: /e/data1/slmet/ml_training/aifs-ea-an-oper-0001-mars-o96-1979-2024-1h-v3-with-era51.zarr
     - regrid:
         in_grid: o96
-        out_grid: o48
+        out_grid: [2, 2]
 
 output:
-  resolution: o48
+  resolution: 2deg
   chunking:
     dates: 1
     variables: -1
