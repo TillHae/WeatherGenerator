@@ -72,7 +72,7 @@ def downsample(in_zarr_path, out_zarr_path, res_deg, freq_hours=6):
             continue
         print(f"Copying array {key}...")
         arr = in_group[key]
-        out_group.create_array(key, data=arr[:], chunks=arr.chunks, compressor=arr.compressor)
+        out_group.create_array(key, data=arr[:], chunks=arr.chunks)
         out_group[key].attrs.update(arr.attrs)
         
     # Write new grid and dates
@@ -95,8 +95,7 @@ def downsample(in_zarr_path, out_zarr_path, res_deg, freq_hours=6):
     
     print(f"Creating new data array with shape {shape} and chunks {chunks}...")
     new_data = out_group.create_array(
-        'data', shape=shape, chunks=tuple(chunks), dtype=old_data.dtype, 
-        compressor=old_data.compressor
+        'data', shape=shape, chunks=tuple(chunks), dtype=old_data.dtype
     )
     new_data.attrs.update(old_data.attrs)
     
