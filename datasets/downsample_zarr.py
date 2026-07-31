@@ -5,10 +5,34 @@ from scipy.spatial import cKDTree
 from tqdm import tqdm
 import argparse
 import pandas as pd
+import concurrent.futures
+import functools
+import numcodecs
+
+def process_batch(start_idx, batch_size, num_dates, valid_indices, shape, indices, in_zarr_path, out_zarr_path, old_dtype):
+    # Re-open datasets inside the worker process to avoid Zstd/Zarr file descriptor corruption!
+    in_group = zarr.open(in_zarr_path, mode='r')
+    out_group = zarr.open(out_zarr_path, mode='a')
+    old_data = in_group['data']
+    new_data = out_group['data']
+    
+    end_idx = min(start_idx + batch_size, num_dates)
+    batch_old_indices = valid_indices[start_idx:end_idx]
+    
+    batch_mapped = np.zeros((end_idx - start_idx, shape[1], shape[2], shape[3]), dtype=old_dtype)
+    for i, old_idx in enumerate(batch_old_indices):
+        date_data = old_data[old_idx, ...] 
+        batch_mapped[i, ...] = date_data[..., indices]
+        
+    new_data[start_idx:end_idx, ...] = batch_mapped
+
 
 def downsample(in_zarr_path, out_zarr_path, res_deg, freq_hours=6):
     print(f"Opening {in_zarr_path}...")
     in_group = zarr.open(in_zarr_path, mode='r')
+    
+    # We will use LZ4 which is extremely fast and much more stable with multiprocessing than Zstd
+    safe_compressor = numcodecs.Blosc(cname='lz4', clevel=5, shuffle=numcodecs.Blosc.BITSHUFFLE)
     
     # 1. Handle dates and frequency
     print("Extracting dates...")
@@ -72,14 +96,14 @@ def downsample(in_zarr_path, out_zarr_path, res_deg, freq_hours=6):
             continue
         print(f"Copying array {key}...")
         arr = in_group[key]
-        out_group.create_array(key, data=arr[:], chunks=arr.chunks)
+        out_group.create_array(key, data=arr[:], chunks=arr.chunks, compressor=safe_compressor)
         out_group[key].attrs.update(arr.attrs)
         
     # Write new grid and dates
     print("Writing new latitudes, longitudes, and dates...")
-    out_group.create_array('latitudes', data=new_lats, chunks=(new_nodes,))
-    out_group.create_array('longitudes', data=new_lons, chunks=(new_nodes,))
-    out_group.create_array('dates', data=new_dates, chunks=(num_dates,))
+    out_group.create_array('latitudes', data=new_lats, chunks=(new_nodes,), compressor=safe_compressor)
+    out_group.create_array('longitudes', data=new_lons, chunks=(new_nodes,), compressor=safe_compressor)
+    out_group.create_array('dates', data=new_dates, chunks=(num_dates,), compressor=safe_compressor)
     out_group['dates'].attrs.update(in_group['dates'].attrs)
     
     # 5. Copy and downsample data
@@ -95,33 +119,32 @@ def downsample(in_zarr_path, out_zarr_path, res_deg, freq_hours=6):
     
     print(f"Creating new data array with shape {shape} and chunks {chunks}...")
     new_data = out_group.create_array(
-        'data', shape=shape, chunks=tuple(chunks), dtype=old_data.dtype
+        'data', shape=shape, chunks=tuple(chunks), dtype=old_data.dtype, compressor=safe_compressor
     )
     new_data.attrs.update(old_data.attrs)
     
-    # Process in chunks to avoid memory issues
-    # valid_indices tells us which indices in old_data to read.
-    # We will read date by date, or chunk of dates by chunk of dates.
-    
     batch_size = chunks[0]
-    print(f"Processing data in batches of {batch_size} dates...")
-    import concurrent.futures
     
-    def process_batch(start_idx):
-        end_idx = min(start_idx + batch_size, num_dates)
-        batch_old_indices = valid_indices[start_idx:end_idx]
-        
-        batch_mapped = np.zeros((end_idx - start_idx, shape[1], shape[2], shape[3]), dtype=old_data.dtype)
-        for i, old_idx in enumerate(batch_old_indices):
-            date_data = old_data[old_idx, ...] 
-            batch_mapped[i, ...] = date_data[..., indices]
-            
-        new_data[start_idx:end_idx, ...] = batch_mapped
+    # Use ProcessPoolExecutor so we get completely isolated C-states for Zarr reading/writing!
+    worker_func = functools.partial(
+        process_batch, 
+        batch_size=batch_size, 
+        num_dates=num_dates, 
+        valid_indices=valid_indices, 
+        shape=shape, 
+        indices=indices, 
+        in_zarr_path=in_zarr_path, 
+        out_zarr_path=out_zarr_path, 
+        old_dtype=old_data.dtype
+    )
+    
+    print(f"Processing data in batches of {batch_size} dates using 16 processes...")
+    with concurrent.futures.ProcessPoolExecutor(max_workers=16) as executor:
+        starts = list(range(0, num_dates, batch_size))
+        futures = [executor.submit(worker_func, s) for s in starts]
+        for future in tqdm(concurrent.futures.as_completed(futures), total=len(futures)):
+            future.result()
 
-    print(f"Processing data in batches of {batch_size} dates sequentially to avoid Zstd corruption...")
-    for s in tqdm(range(0, num_dates, batch_size)):
-        process_batch(s)
-        
     print(f"Successfully created {out_zarr_path}!")
 
 if __name__ == "__main__":
