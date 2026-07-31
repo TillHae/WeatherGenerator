@@ -721,7 +721,11 @@ class Model(torch.nn.Module):
         """
 
         # safe latent prediction
-        tokens_post_norm = self.latent_pre_norm(tokens) if step == 0 else None
+        if step == 0 or self.cf.get("return_latent_tokens", False):
+            tokens_post_norm = self.latent_pre_norm(tokens)
+        else:
+            tokens_post_norm = None
+            
         latent_state = self.tokens_to_latent_state(tokens_post_norm, tokens)
         output.add_latent_prediction(step, "latent_state", latent_state)
 
