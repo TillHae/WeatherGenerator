@@ -6,10 +6,6 @@ streams_directory: "./config/streams/era5_2deg/"
 zarr_store: "zip"
 data_path_anemoi: "/e/scratch/weatherai/hauer1"
 
-training_config:
-  num_mini_epochs: 20
-  max_compute_budget_l6_steps: 8192
-  
 wgtags:
   exp: "coarse_to_fine_multistage"
   stage: "L5"
