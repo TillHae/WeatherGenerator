@@ -116,7 +116,7 @@ general:
   # run_path, 
   # path_shared_
   
-  multiprocessing_method: "spawn"
+  multiprocessing_method: "fork"
 
   desc: ""
   run_id: ???
