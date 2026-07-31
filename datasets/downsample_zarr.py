@@ -7,7 +7,15 @@ import argparse
 import pandas as pd
 import concurrent.futures
 import functools
-import numcodecs
+
+try:
+    from zarr.codecs import BloscCodec
+    safe_compressors = [BloscCodec(cname='lz4', clevel=5, shuffle='bitshuffle')]
+    comp_kwargs = {'compressors': safe_compressors}
+except ImportError:
+    import numcodecs
+    safe_compressor = numcodecs.Blosc(cname='lz4', clevel=5, shuffle=numcodecs.Blosc.BITSHUFFLE)
+    comp_kwargs = {'compressor': safe_compressor}
 
 def process_batch(start_idx, batch_size, num_dates, valid_indices, shape, indices, in_zarr_path, out_zarr_path, old_dtype):
     # Re-open datasets inside the worker process to avoid Zstd/Zarr file descriptor corruption!
@@ -30,9 +38,6 @@ def process_batch(start_idx, batch_size, num_dates, valid_indices, shape, indice
 def downsample(in_zarr_path, out_zarr_path, res_deg, freq_hours=6):
     print(f"Opening {in_zarr_path}...")
     in_group = zarr.open(in_zarr_path, mode='r')
-    
-    # We will use LZ4 which is extremely fast and much more stable with multiprocessing than Zstd
-    safe_compressor = numcodecs.Blosc(cname='lz4', clevel=5, shuffle=numcodecs.Blosc.BITSHUFFLE)
     
     # 1. Handle dates and frequency
     print("Extracting dates...")
@@ -96,14 +101,14 @@ def downsample(in_zarr_path, out_zarr_path, res_deg, freq_hours=6):
             continue
         print(f"Copying array {key}...")
         arr = in_group[key]
-        out_group.create_array(key, data=arr[:], chunks=arr.chunks, compressor=safe_compressor)
+        out_group.create_array(key, data=arr[:], chunks=arr.chunks, **comp_kwargs)
         out_group[key].attrs.update(arr.attrs)
         
     # Write new grid and dates
     print("Writing new latitudes, longitudes, and dates...")
-    out_group.create_array('latitudes', data=new_lats, chunks=(new_nodes,), compressor=safe_compressor)
-    out_group.create_array('longitudes', data=new_lons, chunks=(new_nodes,), compressor=safe_compressor)
-    out_group.create_array('dates', data=new_dates, chunks=(num_dates,), compressor=safe_compressor)
+    out_group.create_array('latitudes', data=new_lats, chunks=(new_nodes,), **comp_kwargs)
+    out_group.create_array('longitudes', data=new_lons, chunks=(new_nodes,), **comp_kwargs)
+    out_group.create_array('dates', data=new_dates, chunks=(num_dates,), **comp_kwargs)
     out_group['dates'].attrs.update(in_group['dates'].attrs)
     
     # 5. Copy and downsample data
@@ -119,7 +124,7 @@ def downsample(in_zarr_path, out_zarr_path, res_deg, freq_hours=6):
     
     print(f"Creating new data array with shape {shape} and chunks {chunks}...")
     new_data = out_group.create_array(
-        'data', shape=shape, chunks=tuple(chunks), dtype=old_data.dtype, compressor=safe_compressor
+        'data', shape=shape, chunks=tuple(chunks), dtype=old_data.dtype, **comp_kwargs
     )
     new_data.attrs.update(old_data.attrs)
     
