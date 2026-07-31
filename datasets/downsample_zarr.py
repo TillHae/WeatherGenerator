@@ -118,14 +118,10 @@ def downsample(in_zarr_path, out_zarr_path, res_deg, freq_hours=6):
             
         new_data[start_idx:end_idx, ...] = batch_mapped
 
-    print(f"Processing data in batches of {batch_size} dates using 16 threads...")
-    
-    with concurrent.futures.ThreadPoolExecutor(max_workers=16) as executor:
-        futures = [executor.submit(process_batch, s) for s in range(0, num_dates, batch_size)]
+    print(f"Processing data in batches of {batch_size} dates sequentially to avoid Zstd corruption...")
+    for s in tqdm(range(0, num_dates, batch_size)):
+        process_batch(s)
         
-        for future in tqdm(concurrent.futures.as_completed(futures), total=len(futures)):
-            future.result()
-
     print(f"Successfully created {out_zarr_path}!")
 
 if __name__ == "__main__":
