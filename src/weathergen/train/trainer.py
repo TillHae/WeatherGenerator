@@ -437,13 +437,17 @@ class Trainer(TrainerBase):
 
         apply_fct_to_blocks(self.model, cf.freeze_modules, set_to_eval)
 
+        logger.info("Initializing dataset iterator...")
         dataset_iter = iter(self.data_loader)
+        logger.info("Dataset iterator initialized!")
 
         self.optimizer.zero_grad()
 
         # training loop
         self.t_start = time.time()
+        logger.info("Waiting for first batch...")
         for bidx, batch in enumerate(dataset_iter):
+            logger.info(f"Received batch {bidx}!")
             if cf.data_loading.get("memory_pinning", False):
                 # pin memory for faster CPU-GPU transfer
                 batch = batch.pin_memory()
