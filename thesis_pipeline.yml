@@ -7,7 +7,7 @@ stages:
     nodes: 1
     slurm_args:
       - "--time=06:00:00"  # ~90 min expected runtime + generous buffer
-      - "--signal=TERM@240"
+      - "--signal=TERM@30"
 
   # --- 2. Multi-Stage: Level 3 ---
   - name: multistageL3
@@ -17,7 +17,7 @@ stages:
     nodes: 1
     slurm_args:
       - "--time=00:30:00"
-      - "--signal=TERM@240"
+      - "--signal=TERM@30"
 
   # --- 3. Multi-Stage: Level 4 ---
   - name: multistageL4
@@ -28,7 +28,7 @@ stages:
     nodes: 1
     slurm_args:
       - "--time=00:45:00"
-      - "--signal=TERM@240"
+      - "--signal=TERM@30"
 
   # --- 4. Multi-Stage: Level 5 ---
   - name: multistageL5
@@ -39,7 +39,7 @@ stages:
     nodes: 1
     slurm_args:
       - "--time=01:45:00"
-      - "--signal=TERM@240"
+      - "--signal=TERM@30"
 
   # --- 5. Multi-Stage: Level 6 (Target) ---
   - name: multistageL6
@@ -50,4 +50,4 @@ stages:
     nodes: 1
     slurm_args:
       - "--time=03:00:00"
-      - "--signal=TERM@240"
+      - "--signal=TERM@30"
