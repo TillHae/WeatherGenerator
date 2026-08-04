@@ -11,6 +11,7 @@
 import copy
 import logging
 import time
+import signal
 from math import sqrt
 
 import numpy as np
@@ -86,6 +87,13 @@ class Trainer(TrainerBase):
         self.batch_size_test_per_gpu = -1
         self.collapse_monitor: CollapseMonitor | None = None
         self.perf_tracker: ThroughputTracker | NullThroughputTracker = NullThroughputTracker()
+        self.time_to_exit = False
+
+        def handle_sigterm(signum, frame):
+            logger.info("Received SIGTERM. Setting flag to save checkpoint and exit gracefully.")
+            self.time_to_exit = True
+
+        signal.signal(signal.SIGTERM, handle_sigterm)
 
     def get_batch_size_total(self, batch_size_per_gpu) -> int:
         """
@@ -387,6 +395,9 @@ class Trainer(TrainerBase):
                 )
             self.train(mini_epoch)
 
+            if self.time_to_exit:
+                break
+
             if is_root():
                 logger.info(
                     f"Mini_epoch {mini_epoch} of {self.training_cfg.num_mini_epochs}: validate."
@@ -572,6 +583,13 @@ class Trainer(TrainerBase):
             if max_budget is not None and self.cf.general.cumulative_compute_l6_steps >= max_budget:
                 if is_root():
                     logger.info(f"Compute budget reached ({self.cf.general.cumulative_compute_l6_steps} >= {max_budget}). Stopping training.")
+                break
+
+            if self.time_to_exit:
+                if is_root():
+                    logger.info("Gracefully stopping training due to SIGTERM. Running validation and saving latest checkpoint.")
+                self.validate(-1, self.validation_cfg, self.batch_size_validation_per_gpu)
+                self.save_model(-1)
                 break
 
         self.dataset.advance()
