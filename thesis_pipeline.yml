@@ -7,7 +7,7 @@ stages:
     nodes: 1
     slurm_args:
       - "--time=06:00:00"
-      - "--signal=TERM@30"
+      - "--signal=TERM@240"
 
   # --- 2. Multi-Stage: Level 3 ---
   - name: multistageL3
@@ -39,7 +39,7 @@ stages:
     nodes: 1
     slurm_args:
       - "--time=01:30:00"
-      - "--signal=TERM@30"
+      - "--signal=TERM@60"
 
   # --- 5. Multi-Stage: Level 6 (Target) ---
   - name: multistageL6
@@ -50,4 +50,4 @@ stages:
     nodes: 1
     slurm_args:
       - "--time=03:30:00"
-      - "--signal=TERM@30"
+      - "--signal=TERM@240"
