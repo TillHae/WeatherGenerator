@@ -90,10 +90,11 @@ class Trainer(TrainerBase):
         self.time_to_exit = False
 
         def handle_sigterm(signum, frame):
-            logger.info("Received SIGTERM. Setting flag to save checkpoint and exit gracefully.")
+            logger.info("Received SIGTERM or SIGUSR1. Setting flag to save checkpoint and exit gracefully.")
             self.time_to_exit = True
 
         signal.signal(signal.SIGTERM, handle_sigterm)
+        signal.signal(signal.SIGUSR1, handle_sigterm)
 
     def get_batch_size_total(self, batch_size_per_gpu) -> int:
         """
