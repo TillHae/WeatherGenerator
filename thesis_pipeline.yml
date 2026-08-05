@@ -28,7 +28,7 @@ stages:
     nodes: 1
     slurm_args:
       - "--time=00:30:00"
-      - "--signal=USR1@60"
+      - "--signal=WINCH@60"
 
   # --- 4. Multi-Stage: Level 5 ---
   - name: multistageL5
@@ -39,7 +39,7 @@ stages:
     nodes: 1
     slurm_args:
       - "--time=01:30:00"
-      - "--signal=USR1@90"
+      - "--signal=WINCH@90"
 
   # --- 5. Multi-Stage: Level 6 (Target) ---
   - name: multistageL6
@@ -50,4 +50,4 @@ stages:
     nodes: 1
     slurm_args:
       - "--time=03:30:00"
-      - "--signal=USR1@240"
+      - "--signal=WINCH@240"
