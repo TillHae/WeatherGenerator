@@ -1,0 +1,21 @@
+stages:
+  # --- 1. Preliminary Multi-Stage: Level 3 ---
+  - name: prelimL3
+    stage: train
+    config_files:
+      - config/config_multistage_L3.yml
+    nodes: 1
+    slurm_args:
+      - "--time=00:20:00"
+      - "--signal=TERM@30"
+
+  # --- 2. Preliminary Multi-Stage: Level 4 ---
+  - name: prelimL4
+    stage: train
+    from_run_id: STAGE.prelimL3
+    config_files:
+      - config/config_multistage_L4.yml
+    nodes: 1
+    slurm_args:
+      - "--time=00:20:00"
+      - "--signal=TERM@30"

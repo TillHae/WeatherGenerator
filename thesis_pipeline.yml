@@ -6,7 +6,7 @@ stages:
       - config/config_baseline_L6.yml
     nodes: 1
     slurm_args:
-      - "--time=06:00:00"  # ~90 min expected runtime + generous buffer
+      - "--time=06:00:00"
       - "--signal=TERM@30"
 
   # --- 2. Multi-Stage: Level 3 ---
@@ -27,7 +27,7 @@ stages:
       - config/config_multistage_L4.yml
     nodes: 1
     slurm_args:
-      - "--time=00:45:00"
+      - "--time=00:30:00"
       - "--signal=TERM@30"
 
   # --- 4. Multi-Stage: Level 5 ---
@@ -38,7 +38,7 @@ stages:
       - config/config_multistage_L5.yml
     nodes: 1
     slurm_args:
-      - "--time=01:45:00"
+      - "--time=01:30:00"
       - "--signal=TERM@30"
 
   # --- 5. Multi-Stage: Level 6 (Target) ---
@@ -49,5 +49,5 @@ stages:
       - config/config_multistage_L6.yml
     nodes: 1
     slurm_args:
-      - "--time=03:00:00"
+      - "--time=03:30:00"
       - "--signal=TERM@30"
