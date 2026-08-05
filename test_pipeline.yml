@@ -1,0 +1,10 @@
+stages:
+  - name: test_multistageL4
+    stage: train
+    from_run_id: w7s3sxbj
+    config_files:
+      - config/config_multistage_L4.yml
+    nodes: 1
+    slurm_args:
+      - "--time=00:10:00"
+      - "--signal=WINCH@60"
