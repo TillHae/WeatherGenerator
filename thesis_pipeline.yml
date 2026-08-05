@@ -7,7 +7,7 @@ stages:
 #    nodes: 1
 #    slurm_args:
 #      - "--time=06:00:00"
-#      - "--signal=TERM@240"
+#      - "--signal=WINCH@240"
 
 #  # --- 2. Multi-Stage: Level 3 ---
 #  - name: multistageL3
@@ -17,7 +17,7 @@ stages:
 #    nodes: 1
 #    slurm_args:
 #      - "--time=00:30:00"
-#      - "--signal=TERM@30"
+#      - "--signal=WINCH@30"
 
   # --- 3. Multi-Stage: Level 4 ---
   - name: multistageL4
