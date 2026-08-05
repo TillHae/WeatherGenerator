@@ -14,6 +14,18 @@ import time
 import signal
 from math import sqrt
 
+
+def _worker_init_ignore_sigusr1(worker_id: int) -> None:
+    """Ignore SIGUSR1 in DataLoader worker processes.
+
+    When Slurm sends SIGUSR1 to trigger graceful shutdown, it is broadcast
+    to all processes in the job step, including DataLoader workers. Workers
+    have no handler for this signal and would crash, killing the entire job.
+    This init function silences SIGUSR1 in every worker so only the main
+    rank processes handle it via their custom handler.
+    """
+    signal.signal(signal.SIGUSR1, signal.SIG_IGN)
+
 import numpy as np
 import torch
 import tqdm
@@ -89,12 +101,11 @@ class Trainer(TrainerBase):
         self.perf_tracker: ThroughputTracker | NullThroughputTracker = NullThroughputTracker()
         self.time_to_exit = False
 
-        def handle_sigterm(signum, frame):
-            logger.info("Received SIGTERM or SIGUSR1. Setting flag to save checkpoint and exit gracefully.")
+        def handle_sigusr1(signum, frame):
+            logger.info("Received SIGUSR1. Setting flag to save checkpoint and exit gracefully.")
             self.time_to_exit = True
 
-        signal.signal(signal.SIGTERM, handle_sigterm)
-        signal.signal(signal.SIGUSR1, handle_sigterm)
+        signal.signal(signal.SIGUSR1, handle_sigusr1)
 
     def get_batch_size_total(self, batch_size_per_gpu) -> int:
         """
@@ -220,6 +231,7 @@ class Trainer(TrainerBase):
             "num_workers": loader_num_workers,
             "pin_memory": cf.data_loading.get("memory_pinning", False),
             "persistent_workers": cf.data_loading.get("persistent_workers", False),
+            "worker_init_fn": _worker_init_ignore_sigusr1,
         }
         self.data_loader_validation = torch.utils.data.DataLoader(
             self.dataset, **loader_params, sampler=None
@@ -270,6 +282,7 @@ class Trainer(TrainerBase):
             "batch_sampler": None,
             "shuffle": False,
             "num_workers": cf.data_loading.num_workers,
+            "worker_init_fn": _worker_init_ignore_sigusr1,
         }
         self.data_loader = torch.utils.data.DataLoader(self.dataset, **loader_params, sampler=None)
         self.data_loader_validation = torch.utils.data.DataLoader(
