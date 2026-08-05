@@ -1,5 +1,5 @@
 stages:
-  - name: test_multistageL4
+  - name: testL4
     stage: train
     from_run_id: w7s3sxbj
     config_files:
