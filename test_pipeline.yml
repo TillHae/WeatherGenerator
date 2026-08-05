@@ -7,4 +7,4 @@ stages:
     nodes: 1
     slurm_args:
       - "--time=00:10:00"
-      - "--signal=WINCH@60"
+      - "--signal=28@60"
