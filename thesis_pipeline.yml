@@ -1,28 +1,28 @@
 stages:
-  # --- 1. Baseline Run (Level 6) ---
-  - name: baselineL6
-    stage: train
-    config_files:
-      - config/config_baseline_L6.yml
-    nodes: 1
-    slurm_args:
-      - "--time=06:00:00"
-      - "--signal=TERM@240"
+#  # --- 1. Baseline Run (Level 6) ---
+#  - name: baselineL6
+#    stage: train
+#    config_files:
+#      - config/config_baseline_L6.yml
+#    nodes: 1
+#    slurm_args:
+#      - "--time=06:00:00"
+#      - "--signal=TERM@240"
 
-  # --- 2. Multi-Stage: Level 3 ---
-  - name: multistageL3
-    stage: train
-    config_files:
-      - config/config_multistage_L3.yml
-    nodes: 1
-    slurm_args:
-      - "--time=00:30:00"
-      - "--signal=TERM@30"
+#  # --- 2. Multi-Stage: Level 3 ---
+#  - name: multistageL3
+#    stage: train
+#    config_files:
+#      - config/config_multistage_L3.yml
+#    nodes: 1
+#    slurm_args:
+#      - "--time=00:30:00"
+#      - "--signal=TERM@30"
 
   # --- 3. Multi-Stage: Level 4 ---
   - name: multistageL4
     stage: train
-    from_run_id: STAGE.multistageL3
+    from_run_id: w7s3sxbj
     config_files:
       - config/config_multistage_L4.yml
     nodes: 1
