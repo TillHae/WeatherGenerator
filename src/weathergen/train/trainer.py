@@ -26,6 +26,49 @@ def _worker_init_ignore_sigterm(worker_id: int) -> None:
     """
     signal.signal(signal.SIGTERM, signal.SIG_IGN)
 
+def get_slurm_time_left() -> float | None:
+    """
+    Polls the Slurm scheduler dynamically for the exact remaining wall-clock time on the job.
+    Returns the remaining time in seconds, or None if the query fails.
+    """
+    import os
+    import subprocess
+    
+    job_id = os.environ.get("SLURM_JOBID")
+    if not job_id:
+        return None
+        
+    try:
+        # Ask squeue for exactly how much time is left on this job
+        output = subprocess.check_output(
+            ["squeue", "-h", "-j", job_id, "-O", "TimeLeft"],
+            text=True,
+            stderr=subprocess.DEVNULL
+        ).strip()
+        
+        if output == "UNLIMITED":
+            return float('inf')
+            
+        days = 0
+        if "-" in output:
+            parts = output.split("-")
+            days = int(parts[0])
+            output = parts[1]
+            
+        time_parts = output.split(":")
+        if len(time_parts) == 3:
+            hours, minutes, seconds = time_parts
+        elif len(time_parts) == 2:
+            hours = 0
+            minutes, seconds = time_parts
+        else:
+            return None
+            
+        total_seconds = (days * 86400) + (int(hours) * 3600) + (int(minutes) * 60) + int(seconds)
+        return float(total_seconds)
+    except Exception:
+        return None
+
 import numpy as np
 import torch
 import tqdm
@@ -185,6 +228,7 @@ class Trainer(TrainerBase):
             )
 
         # In-Python timer to bypass all SLURM/MPI signaling issues
+        import time
         max_time_mins = self.cf.general.get("max_compute_time_minutes", None)
         if max_time_mins is not None:
             # Dynamic buffer based on resolution (L4=60s, L5=90s, L6=240s)
@@ -195,9 +239,17 @@ class Trainer(TrainerBase):
             else:
                 buffer_sec = 240
                 
-            self.shutdown_time = time.time() + (max_time_mins * 60) - buffer_sec
-            if is_root():
-                logger.info(f"Initialized wall-clock timer for {max_time_mins} minutes with {buffer_sec}s buffer. Will shutdown gracefully before limit.")
+            slurm_time_left = get_slurm_time_left()
+            if slurm_time_left is not None:
+                # Use the exact time left from Slurm, perfectly accounting for env setup overhead
+                self.shutdown_time = time.time() + slurm_time_left - buffer_sec
+                if is_root():
+                    logger.info(f"Initialized wall-clock timer dynamically from Slurm: {slurm_time_left}s remaining. Buffer={buffer_sec}s.")
+            else:
+                # Fallback to config limit if squeue fails
+                self.shutdown_time = time.time() + (max_time_mins * 60) - buffer_sec
+                if is_root():
+                    logger.info(f"WARNING: Slurm dynamic polling failed. Falling back to config limit of {max_time_mins} minutes with {buffer_sec}s buffer.")
         else:
             self.shutdown_time = None
 
