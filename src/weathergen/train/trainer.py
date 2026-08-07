@@ -105,9 +105,16 @@ class Trainer(TrainerBase):
         import time
         max_time_mins = self.cf.general.get("max_compute_time_minutes", None)
         if max_time_mins is not None:
-            # 90 second buffer for validation and saving
-            self.shutdown_time = time.time() + (max_time_mins * 60) - 90
-            logger.info(f"Initialized wall-clock timer for {max_time_mins} minutes. Will shutdown gracefully before limit.")
+            # Dynamic buffer based on resolution (L4=60s, L5=90s, L6=240s)
+            if self.cf.healpix_level <= 4:
+                buffer_sec = 60
+            elif self.cf.healpix_level == 5:
+                buffer_sec = 90
+            else:
+                buffer_sec = 240
+                
+            self.shutdown_time = time.time() + (max_time_mins * 60) - buffer_sec
+            logger.info(f"Initialized wall-clock timer for {max_time_mins} minutes with {buffer_sec}s buffer. Will shutdown gracefully before limit.")
         else:
             self.shutdown_time = None
 
