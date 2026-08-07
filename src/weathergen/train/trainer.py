@@ -185,7 +185,6 @@ class Trainer(TrainerBase):
             )
 
         # In-Python timer to bypass all SLURM/MPI signaling issues
-        import time
         max_time_mins = self.cf.general.get("max_compute_time_minutes", None)
         if max_time_mins is not None:
             # Dynamic buffer based on resolution (L4=60s, L5=90s, L6=240s)
@@ -572,7 +571,6 @@ class Trainer(TrainerBase):
             if self.validate_with_ema:
                 self.ema_model.update(self.cf.general.istep * batch_size_total, batch_size_total)
 
-            import time
             if self.shutdown_time is not None and time.time() > self.shutdown_time:
                 logger.info("Wall-clock time limit reached. Setting flag to save checkpoint and exit gracefully.")
                 self.time_to_exit = True
