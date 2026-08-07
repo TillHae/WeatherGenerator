@@ -1,0 +1,15 @@
+healpix_level: 4
+rope_2D: False
+
+# Data streams
+streams_directory: "./config/streams/era5_4deg/"
+zarr_store: "zip"
+data_path_anemoi: "/e/scratch/weatherai/hauer1"
+
+wgtags:
+  exp: "coarse_to_fine_multistage"
+  stage: "L4"
+  issue: null
+
+general:
+  max_compute_time_minutes: 10
