@@ -15,16 +15,16 @@ import signal
 from math import sqrt
 
 
-def _worker_init_ignore_sigwinch(worker_id: int) -> None:
-    """Ignore SIGWINCH in DataLoader worker processes.
+def _worker_init_ignore_sigterm(worker_id: int) -> None:
+    """Ignore SIGTERM in DataLoader worker processes.
 
-    When Slurm sends SIGWINCH to trigger graceful shutdown, it is broadcast
-    to all processes in the job step, including DataLoader workers. Workers
-    have no handler for this signal and would crash, killing the entire job.
-    This init function silences SIGWINCH in every worker so only the main
-    rank processes handle it via their custom handler.
+    When Slurm sends SIGTERM to trigger graceful shutdown, it is broadcast
+    to all processes in the job step, including DataLoader workers.
+    This init function silences SIGTERM in every worker so they don't die
+    mid-batch and cause a RuntimeError in the main process before it can
+    finish saving the checkpoint.
     """
-    signal.signal(signal.SIGWINCH, signal.SIG_IGN)
+    signal.signal(signal.SIGTERM, signal.SIG_IGN)
 
 import numpy as np
 import torch
@@ -100,19 +100,16 @@ class Trainer(TrainerBase):
         self.collapse_monitor: CollapseMonitor | None = None
         self.perf_tracker: ThroughputTracker | NullThroughputTracker = NullThroughputTracker()
         self.time_to_exit = False
-
-        def handle_sigwinch(signum, frame):
-            logger.info("Received SIGWINCH. Setting flag to save checkpoint and exit gracefully.")
-            self.time_to_exit = True
-
-        signal.signal(signal.SIGWINCH, handle_sigwinch)
         
-        # Keep SIGTERM handler as fallback for manual scancel
-        def handle_sigterm(signum, frame):
-            logger.info("Received SIGTERM. Setting flag to save checkpoint and exit gracefully.")
-            self.time_to_exit = True
-
-        signal.signal(signal.SIGTERM, handle_sigterm)
+        # In-Python timer to bypass all SLURM/MPI signaling issues
+        import time
+        max_time_mins = self.cf.general.get("max_compute_time_minutes", None)
+        if max_time_mins is not None:
+            # 90 second buffer for validation and saving
+            self.shutdown_time = time.time() + (max_time_mins * 60) - 90
+            logger.info(f"Initialized wall-clock timer for {max_time_mins} minutes. Will shutdown gracefully before limit.")
+        else:
+            self.shutdown_time = None
 
     def get_batch_size_total(self, batch_size_per_gpu) -> int:
         """
@@ -238,7 +235,7 @@ class Trainer(TrainerBase):
             "num_workers": loader_num_workers,
             "pin_memory": cf.data_loading.get("memory_pinning", False),
             "persistent_workers": cf.data_loading.get("persistent_workers", False),
-            "worker_init_fn": _worker_init_ignore_sigwinch,
+            "worker_init_fn": _worker_init_ignore_sigterm,
         }
         self.data_loader_validation = torch.utils.data.DataLoader(
             self.dataset, **loader_params, sampler=None
@@ -289,7 +286,7 @@ class Trainer(TrainerBase):
             "batch_sampler": None,
             "shuffle": False,
             "num_workers": cf.data_loading.num_workers,
-            "worker_init_fn": _worker_init_ignore_sigwinch,
+            "worker_init_fn": _worker_init_ignore_sigterm,
         }
         self.data_loader = torch.utils.data.DataLoader(self.dataset, **loader_params, sampler=None)
         self.data_loader_validation = torch.utils.data.DataLoader(
@@ -564,6 +561,11 @@ class Trainer(TrainerBase):
             # EMA update
             if self.validate_with_ema:
                 self.ema_model.update(self.cf.general.istep * batch_size_total, batch_size_total)
+
+            import time
+            if self.shutdown_time is not None and time.time() > self.shutdown_time:
+                logger.info("Wall-clock time limit reached. Setting flag to save checkpoint and exit gracefully.")
+                self.time_to_exit = True
 
             self.perf_tracker.step(
                 batch,

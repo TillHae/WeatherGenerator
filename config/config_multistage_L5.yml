@@ -10,3 +10,6 @@ wgtags:
   exp: "coarse_to_fine_multistage"
   stage: "L5"
   issue: null
+
+general:
+  max_compute_time_minutes: 90

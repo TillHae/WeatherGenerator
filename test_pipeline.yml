@@ -4,7 +4,7 @@ stages:
     from_run_id: w7s3sxbj
     config_files:
       - config/config_multistage_L4.yml
+      - config/config_test.yml
     nodes: 1
     slurm_args:
       - "--time=00:10:00"
-      - "--signal=28@60"
