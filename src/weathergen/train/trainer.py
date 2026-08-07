@@ -101,22 +101,7 @@ class Trainer(TrainerBase):
         self.perf_tracker: ThroughputTracker | NullThroughputTracker = NullThroughputTracker()
         self.time_to_exit = False
         
-        # In-Python timer to bypass all SLURM/MPI signaling issues
-        import time
-        max_time_mins = self.cf.general.get("max_compute_time_minutes", None)
-        if max_time_mins is not None:
-            # Dynamic buffer based on resolution (L4=60s, L5=90s, L6=240s)
-            if self.cf.healpix_level <= 4:
-                buffer_sec = 60
-            elif self.cf.healpix_level == 5:
-                buffer_sec = 90
-            else:
-                buffer_sec = 240
-                
-            self.shutdown_time = time.time() + (max_time_mins * 60) - buffer_sec
-            logger.info(f"Initialized wall-clock timer for {max_time_mins} minutes with {buffer_sec}s buffer. Will shutdown gracefully before limit.")
-        else:
-            self.shutdown_time = None
+
 
     def get_batch_size_total(self, batch_size_per_gpu) -> int:
         """
@@ -198,6 +183,24 @@ class Trainer(TrainerBase):
                 warmup_steps=cf.train_logging.get("performance_tracking_warmup_steps", 2),
                 batch_size_per_gpu=self.batch_size_per_gpu,
             )
+
+        # In-Python timer to bypass all SLURM/MPI signaling issues
+        import time
+        max_time_mins = self.cf.general.get("max_compute_time_minutes", None)
+        if max_time_mins is not None:
+            # Dynamic buffer based on resolution (L4=60s, L5=90s, L6=240s)
+            if self.cf.healpix_level <= 4:
+                buffer_sec = 60
+            elif self.cf.healpix_level == 5:
+                buffer_sec = 90
+            else:
+                buffer_sec = 240
+                
+            self.shutdown_time = time.time() + (max_time_mins * 60) - buffer_sec
+            if is_root():
+                logger.info(f"Initialized wall-clock timer for {max_time_mins} minutes with {buffer_sec}s buffer. Will shutdown gracefully before limit.")
+        else:
+            self.shutdown_time = None
 
     def get_target_aux_calculators(self, mode_cfg):
         """
