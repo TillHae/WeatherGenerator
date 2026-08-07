@@ -617,7 +617,7 @@ class Trainer(TrainerBase):
 
             if self.time_to_exit:
                 if is_root():
-                    logger.info("Gracefully stopping training due to SIGTERM. Running validation and saving latest checkpoint.")
+                    logger.info("Gracefully stopping training due to wall-clock time limit. Running validation and saving latest checkpoint.")
                 self.validate(-1, self.validation_cfg, self.batch_size_validation_per_gpu)
                 self.save_model(-1)
                 break
