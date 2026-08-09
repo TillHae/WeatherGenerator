@@ -1,0 +1,32 @@
+stages:
+  # --- 1. Inference: Baseline L6 ---
+  - name: inf_baseline
+    stage: inference
+    from_run_id: ylmg7r8y
+    config_files:
+      - config/config_inference_thesis.yml
+    nodes: 1
+    slurm_args:
+      - "--time=00:30:00"
+
+  # --- 2. Inference: Curriculum L6 ---
+  - name: inf_L6
+    stage: inference
+    from_run_id: wmn145xq
+    config_files:
+      - config/config_inference_thesis.yml
+    nodes: 1
+    slurm_args:
+      - "--time=00:30:00"
+
+  # --- 3. Evaluation Scoring ---
+  - name: eval_thesis
+    stage: evaluation
+    run_ids:
+      - STAGE.inf_baseline
+      - STAGE.inf_L6
+    config_files:
+      - config/evaluate/eval_config.yml
+    nodes: 1
+    slurm_args:
+      - "--time=01:00:00"
