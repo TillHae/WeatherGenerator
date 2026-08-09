@@ -25,8 +25,7 @@ stages:
     run_ids:
       - STAGE.infbaseline
       - STAGE.infL6
-    config_files:
-      - config/evaluate/eval_config.yml
+    eval_config: config/evaluate/eval_config_thesis.yml
     nodes: 1
     slurm_args:
       - "--time=01:00:00"
