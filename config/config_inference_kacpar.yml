@@ -1,0 +1,14 @@
+# Inference configuration for Kacpar's converged baseline evaluation.
+# This model uses a 24-hour time window, so to get a 48-hour rollout,
+# we only need num_steps: 2 (2 * 24h = 48h).
+
+test_config:
+  samples_per_mini_epoch: 50  # Only iterate over 50 samples total
+  start_date: 2023-10-01T00:00
+  end_date: 2023-12-31T00:00
+  forecast:
+    num_steps: 2      # 48-hour rollout (2 steps * 24 hours)
+  output:
+    num_samples: 50   # Write all 50 samples to disk for scoring
+    normalized_samples: False
+    streams: null     # Write all streams

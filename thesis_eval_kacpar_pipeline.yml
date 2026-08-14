@@ -4,7 +4,7 @@ stages:
     stage: inference
     from_run_id: emwo61sy
     config_files:
-      - config/config_inference_thesis.yml
+      - config/config_inference_kacpar.yml
     nodes: 1
     slurm_args:
       - "--time=00:30:00"
