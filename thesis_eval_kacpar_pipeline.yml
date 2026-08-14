@@ -1,0 +1,20 @@
+stages:
+  # --- 1. Inference: Kacpar's Converged L6 ---
+  - name: infkacpar
+    stage: inference
+    from_run_id: emwo61sy
+    config_files:
+      - config/config_inference_thesis.yml
+    nodes: 1
+    slurm_args:
+      - "--time=00:30:00"
+
+  # --- 2. Evaluation Scoring ---
+  - name: evalkacpar
+    stage: evaluation
+    run_ids:
+      - STAGE.infkacpar
+    eval_config: config/evaluate/eval_config_thesis.yml
+    nodes: 1
+    slurm_args:
+      - "--time=01:00:00"
