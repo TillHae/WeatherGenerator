@@ -6,6 +6,8 @@ test_config:
   samples_per_mini_epoch: 50  # Only iterate over 50 samples total
   start_date: 2023-10-01T00:00
   end_date: 2023-12-31T00:00
+  forecast:
+    num_steps: 8      # 48-hour rollout (8 steps * 6 hours)
   output:
     num_samples: 50   # Write all 50 samples to disk for scoring
     normalized_samples: False
