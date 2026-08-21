@@ -139,6 +139,7 @@ def _compute_scores(
 
 def _compute_ranges(
     raw_results: list[tuple[str, int, list, xr.DataArray, list[str]]],
+    global_plotting_options: dict | None = None,
 ) -> dict:
     """Compute colour ranges for each metric/region/channel from the raw score results.
 
@@ -147,7 +148,22 @@ def _compute_ranges(
     score_ranges_dict : dict
         ``{metric: {region: {channel: {'vmin': float, 'vmax': float}}}}``
     """
-    # Accumulate per-channel colour ranges from the completed results.
+    if global_plotting_options is None:
+        global_plotting_options = {}
+    
+    score_maps_config = global_plotting_options.get("score_maps_config", {})
+    
+    # Standard fixed map maximums to ensure consistent scales across runs
+    std_vmax_rmse = {
+        "2t": 4.0, "10u": 5.0, "10v": 5.0,
+        "msl": 500.0, "z": 500.0, "t": 4.0,
+        "u": 5.0, "v": 5.0, "q": 0.005, "tp": 10.0
+    }
+    std_vmax_bias = {
+        "2t": 2.0, "10u": 2.5, "10v": 2.5,
+        "msl": 250.0, "z": 250.0, "t": 2.0,
+        "u": 2.5, "v": 2.5, "q": 0.002, "tp": 5.0
+    }
 
     score_ranges_dict: dict = {}
     for region, _, score_results, _, metric_names in raw_results:
@@ -162,7 +178,41 @@ def _compute_ranges(
                     continue
                 ch_key = str(ch)
                 vmin, vmax = float(vals.min()), float(vals.max())
+                
+                # Check for config overrides
+                metric_cfg = score_maps_config.get(metric, {})
+                ch_cfg = metric_cfg.get(ch_key, {})
+                
+                if "vmin" in ch_cfg and "vmax" in ch_cfg:
+                    vmin = float(ch_cfg["vmin"])
+                    vmax = float(ch_cfg["vmax"])
+                else:
+                    # Apply fixed scales for known variables
+                    if metric in ("rmse", "mae"):
+                        vmin = 0.0
+                        if ch_key in std_vmax_rmse:
+                            vmax = float(std_vmax_rmse[ch_key])
+                    elif metric == "bias":
+                        if ch_key in std_vmax_bias:
+                            vmax = float(std_vmax_bias[ch_key])
+                            vmin = -vmax
+                        else:
+                            # symmetric dynamic bounds for bias
+                            abs_max = max(abs(vmin), abs(vmax))
+                            vmin, vmax = -abs_max, abs_max
+                    elif metric == "acc":
+                        vmin, vmax = 0.0, 1.0
+                    elif metric == "ssim":
+                        vmin, vmax = 0.0, 1.0
+                    
+                    # Apply partial overrides from config
+                    if "vmin" in ch_cfg:
+                        vmin = float(ch_cfg["vmin"])
+                    if "vmax" in ch_cfg:
+                        vmax = float(ch_cfg["vmax"])
+
                 prev = score_ranges_dict[metric][region].get(ch_key)
+                # Keep fixed scale if applied, or max/min across all fsteps
                 score_ranges_dict[metric][region][ch_key] = {
                     "vmin": min(prev["vmin"], vmin) if prev else vmin,
                     "vmax": max(prev["vmax"], vmax) if prev else vmax,

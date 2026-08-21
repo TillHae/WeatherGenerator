@@ -417,7 +417,7 @@ def run_score_map_pipeline(
         n_workers=n_plot_workers,
     )
 
-    score_ranges_dict = _compute_ranges(raw_results)
+    score_ranges_dict = _compute_ranges(raw_results, global_plotting_options)
 
     fstep_tasks: list[dict] = []
     for region in regions:
