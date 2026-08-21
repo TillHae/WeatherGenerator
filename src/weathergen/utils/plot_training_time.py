@@ -107,8 +107,8 @@ def plot_training_loss_time(model_base_dir: Path, out_dir: Path):
     samples, losses = load_run(bl_run_id, model_base_dir)
     if samples is not None:
         time_hours = samples_to_time(samples, bl_duration, 0.0)
-        # Using a regular color (5th in the husl palette) and solid line for the baseline
-        ax.plot(time_hours, losses, label=bl_label, color=COLORS[4], linewidth=2, linestyle="-")
+        # Standardize baseline color to black across all plots
+        ax.plot(time_hours, losses, label=bl_label, color="black", linewidth=2, linestyle="-")
 
     # ── Formatting ─────────────────────────────────────────────────────────────
     import matplotlib.ticker as ticker
