@@ -142,9 +142,9 @@ def main():
     )
     parser.add_argument(
         "-m", "--model_base_dir",
-        default="../../../WeatherGenerator/model",
+        default=None,
         type=Path,
-        help="Base-directory where WeatherGenerator models are saved",
+        help="Base-directory where WeatherGenerator models are saved (default: None, auto-resolves)",
     )
     args = parser.parse_args()
     plot_training_loss_time(args.model_base_dir, args.output_dir)
