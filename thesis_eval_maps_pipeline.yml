@@ -1,0 +1,13 @@
+stages:
+  # --- Evaluation Scoring (Maps Only) ---
+  - name: eval_score_maps
+    stage: evaluation
+    # We reference the previously generated inference outputs directly 
+    # to avoid re-running the expensive inference steps.
+    run_ids:
+      - ylmg7r8y
+      - wmn145xq
+    eval_config: config/evaluate/eval_config_maps_only.yml
+    nodes: 1
+    slurm_args:
+      - "--time=01:00:00"

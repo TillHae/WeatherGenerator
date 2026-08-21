@@ -1,0 +1,41 @@
+evaluation:
+  metrics:
+    - rmse
+    - bias
+  summary_plots: false
+  ratio_plots: false
+  heat_maps: false
+  summary_dir: "./plots/official_evaluation/48h_rollout"
+  plot_ensemble: "members"
+  plot_score_maps: true
+  plot_score_animations: false
+  plot_score_timeseries: false
+  print_summary: false
+  log_scale: false
+  add_grid: false
+  score_cards: false
+  bar_plots: false
+
+default_streams:
+  ERA5:
+    regions: ["global"]
+    channels: ["2t", "10u", "10v", "msl", "z_500", "t_850", "u_850", "v_850"]
+    evaluation:
+      forecast_step: "all"
+      sample: "all"
+      ensemble: "all"
+    plotting:
+      sample: [0]
+      forecast_step: [2, 4, 6, 8] # 12h, 24h, 36h, 48h
+      ensemble: [0]
+      plot_maps: true
+      plot_bias: false
+      plot_target: false
+      plot_histograms: false
+      plot_animations: false
+
+run_ids:
+  ylmg7r8y:
+    label: "Baseline (L6)"
+  wmn145xq:
+    label: "Stage 4 (L6)"
