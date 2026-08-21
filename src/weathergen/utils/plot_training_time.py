@@ -49,13 +49,13 @@ plt.rcParams.update({
 COLORS = sns.color_palette("husl", 5)
 
 CURRICULUM_STAGES = [
-    ("ylmg7r8y", "Stage 1 (Level 3)", 30 / 60),
-    ("w7s3sxbj", "Stage 2 (Level 4)", 30 / 60),
-    ("yxvv3tvj", "Stage 3 (Level 5)", 90 / 60),
-    ("uak7v5j0", "Stage 4 (Level 6)", 210 / 60),
+    ("w7s3sxbj", "Stage 1 (Level 3)", 30 / 60),
+    ("yxvv3tvj", "Stage 2 (Level 4)", 30 / 60),
+    ("uak7v5j0", "Stage 3 (Level 5)", 90 / 60),
+    ("wmn145xq", "Stage 4 (Level 6)", 210 / 60),
 ]
 
-BASELINE_STAGE = ("wmn145xq", "Baseline (Level 6)", 6.0)
+BASELINE_STAGE = ("ylmg7r8y", "Baseline (Level 6)", 6.0)
 
 
 def load_run(run_id: str, model_base_dir: Path):
