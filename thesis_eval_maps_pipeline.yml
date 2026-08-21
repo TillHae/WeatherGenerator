@@ -1,6 +1,6 @@
 stages:
   # --- Evaluation Scoring (Maps Only) ---
-  - name: eval_score_maps
+  - name: evalmaps
     stage: evaluation
     # We reference the previously generated inference outputs directly 
     # to avoid re-running the expensive inference steps.
