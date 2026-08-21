@@ -1,30 +1,10 @@
 stages:
-  # --- 1. Inference: Baseline L6 ---
-  - name: infbaseline
-    stage: inference
-    from_run_id: ylmg7r8y
-    config_files:
-      - config/config_inference_thesis.yml
-    nodes: 1
-    slurm_args:
-      - "--time=00:30:00"
-
-  # --- 2. Inference: Curriculum L6 ---
-  - name: infL6
-    stage: inference
-    from_run_id: wmn145xq
-    config_files:
-      - config/config_inference_thesis.yml
-    nodes: 1
-    slurm_args:
-      - "--time=00:30:00"
-
-  # --- 3. Evaluation Scoring (Maps Only) ---
+  # --- Evaluation Scoring (Maps Only) ---
   - name: evalmaps
     stage: evaluation
     run_ids:
-      - STAGE.infbaseline
-      - STAGE.infL6
+      - qhuhodtq
+      - d0idcy7b
     eval_config: config/evaluate/eval_config_maps_only.yml
     nodes: 1
     slurm_args:
