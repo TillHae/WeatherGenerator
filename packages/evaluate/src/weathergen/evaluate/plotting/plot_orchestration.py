@@ -513,7 +513,7 @@ def _plot_score_maps_per_stream(
                 title = f"{metric} - {channel}: fstep {fstep}" + (
                     f", ens {ens_val}" if ens_val is not None else ""
                 )
-                scores_cfg = score_ranges_dict.get(metric, {}).get(region, {}).get(channel, {})
+                scores_cfg = score_ranges_dict.get(metric, {}).get(region, {}).get(channel, {}).get(fstep, {})
                 plot_tasks.append(
                     {
                         "plotter_cfg": plotter_cfg,

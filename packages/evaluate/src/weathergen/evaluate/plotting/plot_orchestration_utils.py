@@ -166,7 +166,7 @@ def _compute_ranges(
     }
 
     score_ranges_dict: dict = {}
-    for region, _, score_results, _, metric_names in raw_results:
+    for region, fstep, score_results, _, metric_names in raw_results:
         for metric, result in zip(metric_names, score_results, strict=False):
             if result is None or "channel" not in result.coords:
                 continue
@@ -177,6 +177,8 @@ def _compute_ranges(
                 if vals.size == 0:
                     continue
                 ch_key = str(ch)
+                score_ranges_dict[metric][region].setdefault(ch_key, {})
+                
                 vmin, vmax = float(vals.min()), float(vals.max())
                 
                 # Check for config overrides
@@ -187,14 +189,18 @@ def _compute_ranges(
                     vmin = float(ch_cfg["vmin"])
                     vmax = float(ch_cfg["vmax"])
                 else:
-                    # Apply fixed scales for known variables
+                    # Apply fixed scales for known variables, scaled dynamically by fstep!
+                    # This ensures fstep 2 has a tighter colorbar than fstep 8, preventing "all blue" maps.
+                    # We assume fstep 8 (48h) uses the full standard max scale.
+                    fstep_scale = max(0.1, min(1.0, float(fstep) / 8.0))
+                    
                     if metric in ("rmse", "mae"):
                         vmin = 0.0
                         if ch_key in std_vmax_rmse:
-                            vmax = float(std_vmax_rmse[ch_key])
+                            vmax = float(std_vmax_rmse[ch_key]) * fstep_scale
                     elif metric == "bias":
                         if ch_key in std_vmax_bias:
-                            vmax = float(std_vmax_bias[ch_key])
+                            vmax = float(std_vmax_bias[ch_key]) * fstep_scale
                             vmin = -vmax
                         else:
                             # symmetric dynamic bounds for bias
@@ -211,11 +217,10 @@ def _compute_ranges(
                     if "vmax" in ch_cfg:
                         vmax = float(ch_cfg["vmax"])
 
-                prev = score_ranges_dict[metric][region].get(ch_key)
-                # Keep fixed scale if applied, or max/min across all fsteps
-                score_ranges_dict[metric][region][ch_key] = {
-                    "vmin": min(prev["vmin"], vmin) if prev else vmin,
-                    "vmax": max(prev["vmax"], vmax) if prev else vmax,
+                # Save directly per fstep
+                score_ranges_dict[metric][region][ch_key][fstep] = {
+                    "vmin": vmin,
+                    "vmax": vmax,
                 }
 
     return score_ranges_dict
