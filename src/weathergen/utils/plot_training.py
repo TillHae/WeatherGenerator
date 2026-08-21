@@ -303,6 +303,9 @@ def plot_lr(
     plt.grid(True, which="both", ls="-")
     plt.yscale("log")
     plt.gca().yaxis.set_major_formatter(ticker.FuncFormatter(lambda y, _: "{:g}".format(y)))
+    plt.gca().xaxis.set_major_locator(ticker.MaxNLocator(min_n_ticks=4))
+    from matplotlib.ticker import LogLocator, NullFormatter
+    plt.gca().yaxis.set_minor_formatter(ticker.FuncFormatter(lambda y, _: '{:g}'.format(y) if str(y)[0] in ['2', '5'] else ('{:g}'.format(y) if str(y).startswith('0.') and str(y)[2] in ['2', '5'] else '')))
     plt.title("learning rate")
     plt.ylabel("lr")
     plt.xlabel(x_axis)
@@ -363,6 +366,9 @@ def plot_loss_avg(
     plt.grid(True, which="both", ls="-")
     plt.yscale("log")
     plt.gca().yaxis.set_major_formatter(ticker.FuncFormatter(lambda y, _: "{:g}".format(y)))
+    plt.gca().xaxis.set_major_locator(ticker.MaxNLocator(min_n_ticks=4))
+    from matplotlib.ticker import LogLocator, NullFormatter
+    plt.gca().yaxis.set_minor_formatter(ticker.FuncFormatter(lambda y, _: '{:g}'.format(y) if str(y)[0] in ['2', '5'] else ('{:g}'.format(y) if str(y).startswith('0.') and str(y)[2] in ['2', '5'] else '')))
     # cap at 1.0 in case of divergence of run (through normalziation, max should be around 1.0)
     # plt.ylim([0.95 * min_val, (None if max_val < 2.0 else min(1.1, 1.025 * max_val))])
     if x_scale_log:
@@ -533,6 +539,9 @@ def plot_loss_per_stream(
 
                 plt.yscale("log")
                 plt.gca().yaxis.set_major_formatter(ticker.FuncFormatter(lambda y, _: "{:g}".format(y)))
+                plt.gca().xaxis.set_major_locator(ticker.MaxNLocator(min_n_ticks=4))
+                from matplotlib.ticker import LogLocator, NullFormatter
+                plt.gca().yaxis.set_minor_formatter(ticker.FuncFormatter(lambda y, _: '{:g}'.format(y) if str(y)[0] in ['2', '5'] else ('{:g}'.format(y) if str(y).startswith('0.') and str(y)[2] in ['2', '5'] else '')))
                 if x_scale_log:
                     plt.xscale("log")
 
@@ -689,6 +698,9 @@ def plot_loss_per_run(
     plt.title(run_id + " : " + run_desc)
     plt.yscale("log")
     plt.gca().yaxis.set_major_formatter(ticker.FuncFormatter(lambda y, _: "{:g}".format(y)))
+    plt.gca().xaxis.set_major_locator(ticker.MaxNLocator(min_n_ticks=4))
+    from matplotlib.ticker import LogLocator, NullFormatter
+    plt.gca().yaxis.set_minor_formatter(ticker.FuncFormatter(lambda y, _: '{:g}'.format(y) if str(y)[0] in ['2', '5'] else ('{:g}'.format(y) if str(y).startswith('0.') and str(y)[2] in ['2', '5'] else '')))
     if x_scale_log:
         plt.xscale("log")
     plt.grid(True, which="both", ls="-")
