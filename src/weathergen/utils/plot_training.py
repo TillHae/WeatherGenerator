@@ -17,6 +17,8 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+import seaborn as sns
+import matplotlib.ticker as ticker
 import yaml
 
 import weathergen.common.config as config
@@ -27,8 +29,26 @@ _logger = logging.getLogger(__name__)
 
 DEFAULT_RUN_FILE = Path("./config/runs_plot_train.yml")
 MAX_FILENAME_LEN = 255
-PLOT_DPI_VALUE = 150
+PLOT_DPI_VALUE = 300
 
+sns.set_theme(style='whitegrid')
+plt.rcParams.update({'font.size': 14, 'axes.titlesize': 16, 'axes.labelsize': 14, 'legend.fontsize': 10, 'xtick.labelsize': 12, 'ytick.labelsize': 12})
+
+
+
+def _get_run_color(run_id, run_desc, default_color):
+    desc = run_desc.lower()
+    if "baseline" in desc:
+        return "black"
+    if "l3" in desc or "stage 1" in desc:
+        return sns.color_palette("husl", 5)[0]
+    if "l4" in desc or "stage 2" in desc:
+        return sns.color_palette("husl", 5)[1]
+    if "l5" in desc or "stage 3" in desc:
+        return sns.color_palette("husl", 5)[2]
+    if "l6" in desc or "stage 4" in desc:
+        return sns.color_palette("husl", 5)[3]
+    return default_color
 
 def _add_legend(
     labels,
@@ -271,7 +291,7 @@ def plot_lr(
         mask = y_vals > 1000.0
         y_vals[mask] = 0.0  # np.nan
 
-        plt.plot(x_vals, y_vals, linestyle, color=colors[j % len(colors)])
+        plt.plot(x_vals, y_vals, linestyle, color=_get_run_color(run_data.run_id, runs_ids[run_data.run_id], colors[j % len(colors)]))
         legend_str += [("R" if runs_active[j] else "X") + " : " + run_id + " : " + runs_ids[run_id]]
 
     if len(legend_str) < 1:
@@ -282,6 +302,7 @@ def plot_lr(
 
     plt.grid(True, which="both", ls="-")
     plt.yscale("log")
+    plt.gca().yaxis.set_major_formatter(ticker.FuncFormatter(lambda y, _: "{:g}".format(y)))
     plt.title("learning rate")
     plt.ylabel("lr")
     plt.xlabel(x_axis)
@@ -333,7 +354,7 @@ def plot_loss_avg(
         plt.plot(
             x_vals[mask],
             y_vals[mask],
-            color=colors[i_run % len(colors)],
+            color=_get_run_color(run_id, runs_ids[run_id], colors[i_run % len(colors)]),
         )
         legend_str += [
             ("R" if runs_active[i_run] else "X") + " : " + run_id + " : " + runs_ids[run_id]
@@ -341,6 +362,7 @@ def plot_loss_avg(
 
     plt.grid(True, which="both", ls="-")
     plt.yscale("log")
+    plt.gca().yaxis.set_major_formatter(ticker.FuncFormatter(lambda y, _: "{:g}".format(y)))
     # cap at 1.0 in case of divergence of run (through normalziation, max should be around 1.0)
     # plt.ylim([0.95 * min_val, (None if max_val < 2.0 else min(1.1, 1.025 * max_val))])
     if x_scale_log:
@@ -479,7 +501,7 @@ def plot_loss_per_stream(
                                 x_vals[mask],
                                 y_data[mask],
                                 linestyle,
-                                color=colors[j % len(colors)],
+                                color=_get_run_color(run_data.run_id, runs_ids[run_data.run_id], colors[j % len(colors)]),
                                 alpha=alpha,
                             )
                             legend_strs[-1] += [
@@ -510,6 +532,7 @@ def plot_loss_per_stream(
                 plt.grid(True, which="both", ls="-")
 
                 plt.yscale("log")
+                plt.gca().yaxis.set_major_formatter(ticker.FuncFormatter(lambda y, _: "{:g}".format(y)))
                 if x_scale_log:
                     plt.xscale("log")
 
@@ -523,6 +546,9 @@ def plot_loss_per_stream(
                 # if len(title_col) == 0 :
                 # import code; code.interact( local=locals())
                 title_loss = ".".join(title_col.split(".")[:-1])
+                title_loss = title_loss.replace("LossPhysical.", "")
+                if title_loss.endswith(".mse"):
+                    title_loss = "MSE (" + title_loss[:-4] + ")"
                 plt.title(title_loss + " (" + ", ".join(modes) + ")")
                 plt.ylabel(err)
                 plt.xlabel(x_axis if x_type == "step" else "rel. time [h]")
@@ -649,7 +675,7 @@ def plot_loss_per_run(
                             x_vals,
                             y_data,
                             linestyle,
-                            color=colors[j % len(colors)],
+                            color=_get_run_color(run_data.run_id, runs_ids[run_data.run_id], colors[j % len(colors)]),
                             alpha=alpha,
                         )
                         legend_strs[-1] += [col]
@@ -662,6 +688,7 @@ def plot_loss_per_run(
 
     plt.title(run_id + " : " + run_desc)
     plt.yscale("log")
+    plt.gca().yaxis.set_major_formatter(ticker.FuncFormatter(lambda y, _: "{:g}".format(y)))
     if x_scale_log:
         plt.xscale("log")
     plt.grid(True, which="both", ls="-")
