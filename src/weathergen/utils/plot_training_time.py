@@ -46,6 +46,8 @@ plt.rcParams.update({
 
 # ── Stage definitions ──────────────────────────────────────────────────────────
 # Each entry: run_id -> label, color, duration in hours, linestyle
+COLORS = sns.color_palette("husl", 5)
+
 CURRICULUM_STAGES = [
     ("ylmg7r8y", "Stage 1 (Level 3)", 30 / 60),
     ("w7s3sxbj", "Stage 2 (Level 4)", 30 / 60),
@@ -54,8 +56,6 @@ CURRICULUM_STAGES = [
 ]
 
 BASELINE_STAGE = ("wmn145xq", "Baseline (Level 6)", 6.0)
-
-COLORS = sns.color_palette("husl", len(CURRICULUM_STAGES))
 
 
 def load_run(run_id: str, model_base_dir: Path):
@@ -107,10 +107,16 @@ def plot_training_loss_time(model_base_dir: Path, out_dir: Path):
     samples, losses = load_run(bl_run_id, model_base_dir)
     if samples is not None:
         time_hours = samples_to_time(samples, bl_duration, 0.0)
-        ax.plot(time_hours, losses, label=bl_label, color="black", linewidth=2, linestyle="--")
+        # Using a regular color (5th in the husl palette) and solid line for the baseline
+        ax.plot(time_hours, losses, label=bl_label, color=COLORS[4], linewidth=2, linestyle="-")
 
     # ── Formatting ─────────────────────────────────────────────────────────────
+    import matplotlib.ticker as ticker
+    
     ax.set_yscale("log")
+    # Make the log scale y-axis show actual numbers (e.g. 0.05, 0.1) instead of just 10^-1
+    ax.yaxis.set_major_formatter(ticker.FuncFormatter(lambda y, _: '{:g}'.format(y)))
+    
     ax.set_title("Training Loss over Wall-Clock Time")
     ax.set_ylabel("Average Loss (MSE)")
     ax.set_xlabel("Wall-Clock Time (Hours)")
