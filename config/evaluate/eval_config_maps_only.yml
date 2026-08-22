@@ -2,6 +2,7 @@ evaluation:
   metrics:
     - rmse
     - bias
+    - mae
   summary_plots: false
   ratio_plots: false
   heat_maps: false

@@ -164,6 +164,11 @@ def _compute_ranges(
         "msl": 250.0, "z": 250.0, "t": 2.0,
         "u": 2.5, "v": 2.5, "q": 0.002, "tp": 5.0
     }
+    std_vmax_mae = {
+        "2t": 3.0, "10u": 4.0, "10v": 4.0,
+        "msl": 400.0, "z": 400.0, "t": 3.0,
+        "u": 4.0, "v": 4.0, "q": 0.004, "tp": 8.0
+    }
 
     score_ranges_dict: dict = {}
     for region, fstep, score_results, _, metric_names in raw_results:
@@ -194,10 +199,14 @@ def _compute_ranges(
                     # We assume fstep 8 (48h) uses the full standard max scale.
                     fstep_scale = max(0.1, min(1.0, float(fstep) / 8.0))
                     
-                    if metric in ("rmse", "mae"):
+                    if metric == "rmse":
                         vmin = 0.0
                         if ch_key in std_vmax_rmse:
                             vmax = float(std_vmax_rmse[ch_key]) * fstep_scale
+                    elif metric == "mae":
+                        vmin = 0.0
+                        if ch_key in std_vmax_mae:
+                            vmax = float(std_vmax_mae[ch_key]) * fstep_scale
                     elif metric == "bias":
                         if ch_key in std_vmax_bias:
                             vmax = float(std_vmax_bias[ch_key]) * fstep_scale
