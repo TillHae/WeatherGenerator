@@ -9,3 +9,5 @@ stages:
     nodes: 1
     slurm_args:
       - "--time=01:00:00"
+      - "--ntasks=1"
+      - "--cpus-per-task=36"
