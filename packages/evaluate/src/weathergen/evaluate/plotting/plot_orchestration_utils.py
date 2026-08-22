@@ -155,19 +155,19 @@ def _compute_ranges(
     
     # Standard fixed map maximums to ensure consistent scales across runs
     std_vmax_rmse = {
-        "2t": 4.0, "10u": 5.0, "10v": 5.0,
-        "msl": 500.0, "z": 500.0, "t": 4.0,
-        "u": 5.0, "v": 5.0, "q": 0.005, "tp": 10.0
+        "2t": 16.0, "10u": 20.0, "10v": 20.0,
+        "msl": 2000.0, "z": 2000.0, "t": 16.0,
+        "u": 20.0, "v": 20.0, "q": 0.02, "tp": 40.0
     }
     std_vmax_bias = {
-        "2t": 2.0, "10u": 2.5, "10v": 2.5,
-        "msl": 250.0, "z": 250.0, "t": 2.0,
-        "u": 2.5, "v": 2.5, "q": 0.002, "tp": 5.0
+        "2t": 8.0, "10u": 10.0, "10v": 10.0,
+        "msl": 1000.0, "z": 1000.0, "t": 8.0,
+        "u": 10.0, "v": 10.0, "q": 0.008, "tp": 20.0
     }
     std_vmax_mae = {
-        "2t": 3.0, "10u": 4.0, "10v": 4.0,
-        "msl": 400.0, "z": 400.0, "t": 3.0,
-        "u": 4.0, "v": 4.0, "q": 0.004, "tp": 8.0
+        "2t": 16.0, "10u": 16.0, "10v": 16.0,
+        "msl": 1600.0, "z": 1600.0, "t": 12.0,
+        "u": 16.0, "v": 16.0, "q": 0.016, "tp": 32.0
     }
 
     score_ranges_dict: dict = {}
@@ -197,7 +197,7 @@ def _compute_ranges(
                     # Apply fixed scales for known variables, scaled dynamically by fstep!
                     # This ensures fstep 2 has a tighter colorbar than fstep 8, preventing "all blue" maps.
                     # We assume fstep 8 (48h) uses the full standard max scale.
-                    fstep_scale = max(0.1, min(1.0, float(fstep) / 8.0))
+                    fstep_scale = max(0.1, min(1.0, (float(fstep) + 2.0) / 10.0))
                     
                     if metric == "rmse":
                         vmin = 0.0
