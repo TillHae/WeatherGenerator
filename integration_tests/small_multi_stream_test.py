@@ -217,8 +217,7 @@ def assert_stream_losses_below_threshold(run_id, stage="train"):
 
         assert loss is not None, f"'LossPhysical.{stream_name}.mse.avg' {stage} metric is missing"
         assert loss < threshold, (
-            f"'LossPhysical.{stream_name}.mse.avg' {stage} loss is {loss}, expected below "
-            f"{threshold}"
+            f"'LossPhysical.{stream_name}.mse.avg' {stage} loss is {loss}, expected below {threshold}"
         )
 
         losses[stream_name] = loss
