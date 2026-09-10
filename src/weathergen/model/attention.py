@@ -77,6 +77,14 @@ class BaseAttention(torch.nn.Module):
             self.lnorm_q = torch.nn.Identity()
             self.lnorm_k = torch.nn.Identity()
 
+    def _make_proj_heads(self, dim_embed, dim_embed_kv=None):
+        dim_embed_kv = dim_embed_kv if dim_embed_kv else dim_embed
+
+        self.proj_heads_q = torch.nn.Linear(dim_embed, self.num_heads * self.dim_head_proj, bias=False)
+        self.proj_heads_k = torch.nn.Linear(dim_embed, self.num_heads * self.dim_head_proj, bias=False)
+        self.proj_heads_v = torch.nn.Linear(dim_embed, self.num_heads * self.dim_head_proj, bias=False)
+        self.proj_out = torch.nn.Linear(self.num_heads * self.dim_head_proj, dim_embed, bias=False)
+
 
 class MultiSelfAttentionHeadVarlen(BaseAttention):
     def __init__(
@@ -105,10 +113,8 @@ class MultiSelfAttentionHeadVarlen(BaseAttention):
             self.lnorm = AdaLayerNorm(dim_embed, dim_aux, norm_eps=self.norm_eps)
         else:
             self.lnorm = self.norm(dim_embed, eps=self.norm_eps)
-        self.proj_heads_q = torch.nn.Linear(dim_embed, num_heads * self.dim_head_proj, bias=False)
-        self.proj_heads_k = torch.nn.Linear(dim_embed, num_heads * self.dim_head_proj, bias=False)
-        self.proj_heads_v = torch.nn.Linear(dim_embed, num_heads * self.dim_head_proj, bias=False)
-        self.proj_out = torch.nn.Linear(dim_embed, dim_embed, bias=False)
+
+        self._make_proj_heads(dim_embed)
 
     def forward(self, x, x_lens, ada_ln_aux=None, coords=None):
         if self.with_residual:
@@ -173,10 +179,8 @@ class MultiSelfAttentionHeadVarlenFlex(BaseAttention):
         self._make_qk_lnorms()
 
         self.lnorm = self.norm(dim_embed, eps=self.norm_eps)
-        self.proj_heads_q = torch.nn.Linear(dim_embed, num_heads * self.dim_head_proj, bias=False)
-        self.proj_heads_k = torch.nn.Linear(dim_embed, num_heads * self.dim_head_proj, bias=False)
-        self.proj_heads_v = torch.nn.Linear(dim_embed, num_heads * self.dim_head_proj, bias=False)
-        self.proj_out = torch.nn.Linear(dim_embed, dim_embed, bias=False)
+        
+        self._make_proj_heads(dim_embed)
 
         def att(qs, ks, vs, x_mask):
             def sparsity_mask(score, b, h, q_idx, kv_idx):
@@ -236,10 +240,8 @@ class MultiSelfAttentionHeadLocal(BaseAttention):
             self.lnorm = AdaLayerNorm(dim_embed, dim_aux, norm_eps=self.norm_eps)
         else:
             self.lnorm = self.norm(dim_embed, eps=self.norm_eps)
-        self.proj_heads_q = torch.nn.Linear(dim_embed, num_heads * self.dim_head_proj, bias=False)
-        self.proj_heads_k = torch.nn.Linear(dim_embed, num_heads * self.dim_head_proj, bias=False)
-        self.proj_heads_v = torch.nn.Linear(dim_embed, num_heads * self.dim_head_proj, bias=False)
-        self.proj_out = torch.nn.Linear(dim_embed, dim_embed, bias=False)
+
+        self._make_proj_heads(dim_embed)
 
         # define block mask
         def mask_block_local(batch, head, idx_q, idx_kv):
@@ -301,17 +303,9 @@ class MultiCrossAttentionHeadVarlen(BaseAttention):
             self.lnorm_in_q = AdaLayerNorm(dim_embed_q, dim_aux, norm_eps=self.norm_eps)
         else:
             self.lnorm_in_q = self.norm(dim_embed_q, eps=self.norm_eps)
+
         self.lnorm_in_kv = self.norm(dim_embed_kv, eps=self.norm_eps)
-
-        self.proj_heads_q = torch.nn.Linear(dim_embed_q, num_heads * self.dim_head_proj, bias=False)
-        self.proj_heads_k = torch.nn.Linear(
-            dim_embed_kv, num_heads * self.dim_head_proj, bias=False
-        )
-        self.proj_heads_v = torch.nn.Linear(
-            dim_embed_kv, num_heads * self.dim_head_proj, bias=False
-        )
-
-        self.proj_out = torch.nn.Linear(self.dim_head_proj * num_heads, dim_embed_q, bias=False)
+        self._make_proj_heads(dim_embed_q, dim_embed_kv)
 
     def forward(self, x_q, x_kv, x_q_lens=None, x_kv_lens=None, ada_ln_aux=None):
         if self.with_residual:
@@ -471,10 +465,8 @@ class MultiSelfAttentionHead(BaseAttention):
             self.lnorm = AdaLayerNorm(dim_embed, dim_aux, norm_eps=self.norm_eps)
         else:
             self.lnorm = self.norm(dim_embed, eps=self.norm_eps)
-        self.proj_heads_q = torch.nn.Linear(dim_embed, num_heads * self.dim_head_proj, bias=False)
-        self.proj_heads_k = torch.nn.Linear(dim_embed, num_heads * self.dim_head_proj, bias=False)
-        self.proj_heads_v = torch.nn.Linear(dim_embed, num_heads * self.dim_head_proj, bias=False)
-        self.proj_out = torch.nn.Linear(dim_embed, dim_embed, bias=False)
+
+        self._make_proj_heads(dim_embed)
 
         if self.with_flash:
             self.att = torch.nn.functional.scaled_dot_product_attention
@@ -533,14 +525,7 @@ class MultiCrossAttentionHead(BaseAttention):
         self.lnorm_in_q = self.norm(dim_embed_q, eps=self.norm_eps)
         self.lnorm_in_kv = self.norm(dim_embed_kv, eps=self.norm_eps)
 
-        self.proj_heads_q = torch.nn.Linear(dim_embed_q, num_heads * self.dim_head_proj, bias=False)
-        self.proj_heads_k = torch.nn.Linear(
-            dim_embed_kv, num_heads * self.dim_head_proj, bias=False
-        )
-        self.proj_heads_v = torch.nn.Linear(
-            dim_embed_kv, num_heads * self.dim_head_proj, bias=False
-        )
-        self.proj_out = torch.nn.Linear(self.dim_head_proj * num_heads, dim_embed_q, bias=False)
+        self._make_proj_heads(dim_embed_q, dim_embed_kv)
 
         self.att = torch.nn.functional.scaled_dot_product_attention
         self.softmax = torch.nn.Softmax(dim=-1)
