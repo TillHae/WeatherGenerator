@@ -56,23 +56,23 @@ class BaseAttention(torch.nn.Module):
         )
 
         if norm_type == "LayerNorm":
-            self.norm = partial(torch.nn.LayerNorm, elementwise_affine=False)
+            self.norm = partial(torch.nn.LayerNorm, elementwise_affine=False, eps=self.norm_eps)
         else:
-            self.norm = RMSNorm
+            self.norm = partial(RMSNorm, eps=self.norm_eps)
 
         qk_norm_type = qk_norm_type or norm_type
         if qk_norm_type == "LayerNorm":
-            self.qk_norm = partial(torch.nn.LayerNorm, elementwise_affine=False)
+            self.qk_norm = partial(torch.nn.LayerNorm, elementwise_affine=False, eps=self.norm_eps)
         else:
-            self.qk_norm = RMSNorm
+            self.qk_norm = partial(RMSNorm, eps=self.norm_eps)
 
         assert with_flash, "Only flash attention supported at the moment"
 
     def _make_qk_lnorms(self):
         if self.with_qk_lnorm:
             lnorm = self.qk_norm
-            self.lnorm_q = lnorm(self.dim_head_proj, eps=self.norm_eps)
-            self.lnorm_k = lnorm(self.dim_head_proj, eps=self.norm_eps)
+            self.lnorm_q = lnorm(self.dim_head_proj)
+            self.lnorm_k = lnorm(self.dim_head_proj)
         else:
             self.lnorm_q = torch.nn.Identity()
             self.lnorm_k = torch.nn.Identity()
@@ -112,7 +112,7 @@ class MultiSelfAttentionHeadVarlen(BaseAttention):
         if dim_aux is not None:
             self.lnorm = AdaLayerNorm(dim_embed, dim_aux, norm_eps=self.norm_eps)
         else:
-            self.lnorm = self.norm(dim_embed, eps=self.norm_eps)
+            self.lnorm = self.norm(dim_embed)
 
         self._make_proj_heads(dim_embed)
 
@@ -178,7 +178,7 @@ class MultiSelfAttentionHeadVarlenFlex(BaseAttention):
 
         self._make_qk_lnorms()
 
-        self.lnorm = self.norm(dim_embed, eps=self.norm_eps)
+        self.lnorm = self.norm(dim_embed)
         
         self._make_proj_heads(dim_embed)
 
@@ -239,7 +239,7 @@ class MultiSelfAttentionHeadLocal(BaseAttention):
         if dim_aux is not None:
             self.lnorm = AdaLayerNorm(dim_embed, dim_aux, norm_eps=self.norm_eps)
         else:
-            self.lnorm = self.norm(dim_embed, eps=self.norm_eps)
+            self.lnorm = self.norm(dim_embed)
 
         self._make_proj_heads(dim_embed)
 
@@ -302,9 +302,9 @@ class MultiCrossAttentionHeadVarlen(BaseAttention):
         if dim_aux is not None:
             self.lnorm_in_q = AdaLayerNorm(dim_embed_q, dim_aux, norm_eps=self.norm_eps)
         else:
-            self.lnorm_in_q = self.norm(dim_embed_q, eps=self.norm_eps)
+            self.lnorm_in_q = self.norm(dim_embed_q)
 
-        self.lnorm_in_kv = self.norm(dim_embed_kv, eps=self.norm_eps)
+        self.lnorm_in_kv = self.norm(dim_embed_kv)
         self._make_proj_heads(dim_embed_q, dim_embed_kv)
 
     def forward(self, x_q, x_kv, x_q_lens=None, x_kv_lens=None, ada_ln_aux=None):
@@ -374,8 +374,8 @@ class MultiCrossAttentionHeadVarlenSlicedQ(BaseAttention):
         if dim_aux is not None:
             self.lnorm_in_q = AdaLayerNorm(dim_embed_q, dim_aux, norm_eps=self.norm_eps)
         else:
-            self.lnorm_in_q = self.norm(dim_embed_q, eps=self.norm_eps)
-        self.lnorm_in_kv = self.norm(dim_embed_kv, eps=self.norm_eps)
+            self.lnorm_in_q = self.norm(dim_embed_q)
+        self.lnorm_in_kv = self.norm(dim_embed_kv)
 
         assert self.num_heads % num_slices_q == 0
         num_heads_r = self.num_heads
@@ -464,7 +464,7 @@ class MultiSelfAttentionHead(BaseAttention):
         if dim_aux is not None:
             self.lnorm = AdaLayerNorm(dim_embed, dim_aux, norm_eps=self.norm_eps)
         else:
-            self.lnorm = self.norm(dim_embed, eps=self.norm_eps)
+            self.lnorm = self.norm(dim_embed)
 
         self._make_proj_heads(dim_embed)
 
@@ -522,8 +522,8 @@ class MultiCrossAttentionHead(BaseAttention):
 
         self._make_qk_lnorms()
 
-        self.lnorm_in_q = self.norm(dim_embed_q, eps=self.norm_eps)
-        self.lnorm_in_kv = self.norm(dim_embed_kv, eps=self.norm_eps)
+        self.lnorm_in_q = self.norm(dim_embed_q)
+        self.lnorm_in_kv = self.norm(dim_embed_kv)
 
         self._make_proj_heads(dim_embed_q, dim_embed_kv)
 
