@@ -80,9 +80,15 @@ class BaseAttention(torch.nn.Module):
     def _make_proj_heads(self, dim_embed, dim_embed_kv=None):
         dim_embed_kv = dim_embed_kv if dim_embed_kv else dim_embed
 
-        self.proj_heads_q = torch.nn.Linear(dim_embed, self.num_heads * self.dim_head_proj, bias=False)
-        self.proj_heads_k = torch.nn.Linear(dim_embed, self.num_heads * self.dim_head_proj, bias=False)
-        self.proj_heads_v = torch.nn.Linear(dim_embed, self.num_heads * self.dim_head_proj, bias=False)
+        self.proj_heads_q = torch.nn.Linear(
+            dim_embed, self.num_heads * self.dim_head_proj, bias=False
+        )
+        self.proj_heads_k = torch.nn.Linear(
+            dim_embed, self.num_heads * self.dim_head_proj, bias=False
+        )
+        self.proj_heads_v = torch.nn.Linear(
+            dim_embed, self.num_heads * self.dim_head_proj, bias=False
+        )
         self.proj_out = torch.nn.Linear(self.num_heads * self.dim_head_proj, dim_embed, bias=False)
 
 
@@ -179,7 +185,7 @@ class MultiSelfAttentionHeadVarlenFlex(BaseAttention):
         self._make_qk_lnorms()
 
         self.lnorm = self.norm(dim_embed)
-        
+
         self._make_proj_heads(dim_embed)
 
         def att(qs, ks, vs, x_mask):
