@@ -44,6 +44,12 @@ class BaseAttention(torch.nn.Module):
         self.lnorm_q = None
         self.lnorm_k = None
 
+        # values assigned by _make_proj_heads() in subclasses that use standard projections
+        self.proj_heads_q = None
+        self.proj_heads_k = None
+        self.proj_heads_v = None
+        self.proj_out = None
+
         self.num_heads = num_heads
         self.with_flash = with_flash
         self.with_residual = with_residual
