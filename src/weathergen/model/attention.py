@@ -90,10 +90,10 @@ class BaseAttention(torch.nn.Module):
             dim_embed, self.num_heads * self.dim_head_proj, bias=False
         )
         self.proj_heads_k = torch.nn.Linear(
-            dim_embed, self.num_heads * self.dim_head_proj, bias=False
+            dim_embed_kv, self.num_heads * self.dim_head_proj, bias=False
         )
         self.proj_heads_v = torch.nn.Linear(
-            dim_embed, self.num_heads * self.dim_head_proj, bias=False
+            dim_embed_kv, self.num_heads * self.dim_head_proj, bias=False
         )
         self.proj_out = torch.nn.Linear(self.num_heads * self.dim_head_proj, dim_embed, bias=False)
 
