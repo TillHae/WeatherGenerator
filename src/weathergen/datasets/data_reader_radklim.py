@@ -16,6 +16,7 @@ import yaml
 import netCDF4 as nc
 import numpy as np
 from numpy.typing import NDArray
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 from weathergen.common.config import PROJECT_ROOT
 from weathergen.datasets.data_reader_base import (
@@ -342,11 +343,11 @@ class DataReaderRadklim(DataReaderTimestep):
             opened netCDF dataset
         """
         # Use cached file if same path
-        if cache and self.current_filepath == filepath and self.current_file is not None:
+        if cache and getattr(self, "current_filepath", None) == filepath and getattr(self, "current_file", None) is not None:
             return self.current_file
 
         # Close previous file
-        if self.current_file is not None:
+        if getattr(self, "current_file", None) is not None:
             try:
                 self.current_file.close()
             except Exception:
@@ -540,45 +541,58 @@ class DataReaderRadklim(DataReaderTimestep):
 
         return rd
 
+    def _compute_file_stats(self, filepath: Path):
+        """Standalone worker function for multiprocessing dataset statistics."""
+        try:
+            with nc.Dataset(filepath, "r") as ds:
+                rr_data = ds.variables["RR"][:]
+            # Flatten and remove masked/invalid values
+            if np.ma.is_masked(rr_data):
+                valid_data = rr_data.compressed()
+            else:
+                valid_data = rr_data.flatten()
+            # Filter out RADKLIM fill values and NaNs
+            valid_data = valid_data[valid_data < 900.0]
+            valid_data = valid_data[~np.isnan(valid_data)]
+            # Accumulate sums (using float64 to prevent overflow)
+            valid_data_64 = valid_data.astype(np.float64)
+            
+            return (
+                float(np.sum(valid_data_64)), 
+                float(np.sum(valid_data_64 ** 2)), 
+                int(len(valid_data_64))
+            )
+        except Exception as e:
+            return (filepath, str(e))
+
     def _calculate_and_save_statistics(self, stats_file: Path) -> None:
         """
         Calculates the global mean and standard deviation across all valid RADKLIM 
-        data points and saves it to a YAML file.
+        data points and saves it to a YAML file using multiprocessing.
         """
-        import yaml
-
         total_sum = 0.0
         total_sq_sum = 0.0
         count = 0
-
-        _logger.info(f"Starting to process {len(self.file_index)} files for statistics...")
-
-        for i, entry in enumerate(self.file_index):
-            if i > 0 and i % 12 == 0:
-                _logger.info(f"Processing file {i}/{len(self.file_index)}")
+        _logger.info(f"Starting to process {len(self.file_index)} files for statistics using multiprocessing...")
+        # Extract filepaths
+        filepaths = [entry["path"] for entry in self.file_index]
+        # Use 16 parallel workers
+        with ProcessPoolExecutor(max_workers=16) as executor:
+            # Submit all files to the pool
+            futures = {executor.submit(self._compute_file_stats, path): path for path in filepaths}
+            for i, future in enumerate(as_completed(futures)):
+                if i > 0 and i % 25 == 0:
+                    _logger.info(f"Processed {i}/{len(filepaths)} files...")
                 
-            try:
-                ds = self._open_file(entry["path"], cache=False)
-                rr_data = ds.variables["RR"][:]
-
-                # Flatten and remove masked/invalid values
-                if np.ma.is_masked(rr_data):
-                    valid_data = rr_data.compressed()
+                result = future.result()
+                if len(result) == 3:
+                    f_sum, f_sq_sum, f_count = result
+                    total_sum += f_sum
+                    total_sq_sum += f_sq_sum
+                    count += f_count
                 else:
-                    valid_data = rr_data.flatten()
-
-                # Filter out RADKLIM fill values (>= 900.0) and NaNs
-                valid_data = valid_data[valid_data < 900.0]
-                valid_data = valid_data[~np.isnan(valid_data)]
-
-                # Accumulate sums (using float64 to prevent overflow)
-                valid_data_64 = valid_data.astype(np.float64)
-                total_sum += np.sum(valid_data_64)
-                total_sq_sum += np.sum(valid_data_64 ** 2)
-                count += len(valid_data_64)
-                
-            except Exception as e:
-                _logger.warning(f"Could not read {entry['path']} during statistics calculation: {e}")
+                    path, err = result
+                    _logger.warning(f"Could not read {path} during statistics calculation: {err}")
 
         if count == 0:
             raise ValueError("No valid data found to calculate statistics.")
