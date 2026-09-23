@@ -12,10 +12,12 @@ import logging
 from pathlib import Path
 from typing import override
 
+import yaml
 import netCDF4 as nc
 import numpy as np
 from numpy.typing import NDArray
 
+from weathergen.common.config import PROJECT_ROOT
 from weathergen.datasets.data_reader_base import (
     NPDT64,
     NPTDel64,
@@ -73,7 +75,7 @@ class DataReaderRadklim(DataReaderTimestep):
             index_path = Path(index_file)
             if not index_path.is_absolute():
                 # Make path relative to repo root
-                index_path = Path(__file__).parent.parent.parent.parent / index_path
+                index_path = PROJECT_ROOT / index_path
 
             if index_path.exists():
                 _logger.info(f"Loading file index from: {index_path}")
@@ -154,6 +156,34 @@ class DataReaderRadklim(DataReaderTimestep):
         self.mean = np.array([0.1], dtype=np.float32)  # ~0.1 mm/hr average
         self.stdev = np.array([1.0], dtype=np.float32)  # ~1.0 mm/hr std dev
 
+        stats_file = self.base_path / "statistics.yml"
+        calc_stats = stream_info.get("calc_stats", False)
+
+        # read saved mean and stdev
+        if stats_file.exists():
+            _logger.info(f"Loading actual statistics from {stats_file}")
+            with stats_file.open("r") as f:
+                statistics = yaml.safe_load(f)
+            
+            if "mean" in statistics and statistics["mean"] is not None:
+                self.mean = np.array([statistics["mean"]], dtype=np.float32)
+
+            if "stdev" in statistics and statistics["stdev"] is not None:
+                self.stdev = np.array([statistics["stdev"]], dtype=np.float32)
+        # calculate mean and stdev
+        elif calc_stats:
+            _logger.info(f"statistics.yml not found and calc_stats=True. Calculating statistics...")
+            self._calculate_and_save_statistics(stats_file)
+            
+            with stats_file.open("r") as f:
+                statistics = yaml.safe_load(f)
+            
+            self.mean = np.array([statistics["mean"]], dtype=np.float32)
+            self.stdev = np.array([statistics["stdev"]], dtype=np.float32)
+            
+        else:
+            _logger.info(f"No statistics.yml found and calc_stats=False. Falling back to default mean (0.1) and stdev (1.0).")
+
         # Select channels (use netCDF variable name)
         available_channels = ["RR"]
 
@@ -182,11 +212,6 @@ class DataReaderRadklim(DataReaderTimestep):
 
         # Get target channel weights
         self.target_channel_weights = self.parse_target_channel_weights()
-
-        # Set properties (required by downstream code)
-        self.properties = {
-            "stream_id": 1,
-        }
 
         # File caching
         self.current_file = None
@@ -228,12 +253,8 @@ class DataReaderRadklim(DataReaderTimestep):
                         start_time = times[0]
                         end_time = times[-1]
 
-                        # Extract year and month from filename
-                        # Pattern: RW_2017.002_YYYYMM.nc
-                        filename = nc_file.name
-                        year_month_part = filename.split("_")[-1].replace(".nc", "")
-                        year = int(year_month_part[:4])
-                        month = int(year_month_part[4:6])
+                        year = start_time.year
+                        month = start_time.month
 
                         file_index.append(
                             {
@@ -345,9 +366,6 @@ class DataReaderRadklim(DataReaderTimestep):
         self.n_grid_points = 0
         self.grid_shape = (0, 0)
         self.file_index = []
-        # Set properties for empty reader
-        if not hasattr(self, 'properties'):
-            self.properties = {"stream_id": 0}
 
     @override
     def length(self) -> int:
@@ -522,6 +540,65 @@ class DataReaderRadklim(DataReaderTimestep):
 
         return rd
 
+    def _calculate_and_save_statistics(self, stats_file: Path) -> None:
+        """
+        Calculates the global mean and standard deviation across all valid RADKLIM 
+        data points and saves it to a YAML file.
+        """
+        import yaml
+
+        total_sum = 0.0
+        total_sq_sum = 0.0
+        count = 0
+
+        _logger.info(f"Starting to process {len(self.file_index)} files for statistics...")
+
+        for i, entry in enumerate(self.file_index):
+            if i > 0 and i % 12 == 0:
+                _logger.info(f"Processing file {i}/{len(self.file_index)}")
+                
+            try:
+                ds = self._open_file(entry["path"], cache=False)
+                rr_data = ds.variables["RR"][:]
+
+                # Flatten and remove masked/invalid values
+                if np.ma.is_masked(rr_data):
+                    valid_data = rr_data.compressed()
+                else:
+                    valid_data = rr_data.flatten()
+
+                # Filter out RADKLIM fill values (>= 900.0) and NaNs
+                valid_data = valid_data[valid_data < 900.0]
+                valid_data = valid_data[~np.isnan(valid_data)]
+
+                # Accumulate sums (using float64 to prevent overflow)
+                valid_data_64 = valid_data.astype(np.float64)
+                total_sum += np.sum(valid_data_64)
+                total_sq_sum += np.sum(valid_data_64 ** 2)
+                count += len(valid_data_64)
+                
+            except Exception as e:
+                _logger.warning(f"Could not read {entry['path']} during statistics calculation: {e}")
+
+        if count == 0:
+            raise ValueError("No valid data found to calculate statistics.")
+
+        # Calculate population mean and standard deviation
+        mean = total_sum / count
+        variance = (total_sq_sum / count) - (mean ** 2)
+        stdev = np.sqrt(variance)
+
+        # Create the dictionary and save it to YAML
+        stats = {
+            "mean": float(mean),
+            "stdev": float(stdev)
+        }
+
+        with stats_file.open("w") as f:
+            yaml.dump(stats, f, default_flow_style=False)
+
+        _logger.info(f"Successfully calculated and saved statistics: {stats}")
+    
     def __del__(self):
         """Close any open files"""
         if hasattr(self, "current_file") and self.current_file is not None:

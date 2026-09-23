@@ -33,6 +33,7 @@ _DEFAULT_CONFIG_PTH = _REPO_ROOT / "config" / "default_config.yml"
 _DATETIME_TYPE_NAME = "datetime"  # Names for custom resolvers used in Omegaconf
 _TIMEDELTA_TYPE_NAME = "timedelta"
 
+PROJECT_ROOT = Path(__file__).resolve().parents[5]
 
 _logger = logging.getLogger(__name__)
 
