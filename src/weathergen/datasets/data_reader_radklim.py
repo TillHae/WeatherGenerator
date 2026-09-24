@@ -31,7 +31,6 @@ from weathergen.datasets.data_reader_base import (
 
 _logger = logging.getLogger(__name__)
 
-
 class DataReaderRadklim(DataReaderTimestep):
     """
     Data reader for RADKLIM (DWD radar-based precipitation climatology) dataset in netCDF format.
@@ -228,7 +227,7 @@ class DataReaderRadklim(DataReaderTimestep):
 
     def _build_file_index(self) -> list[dict]:
         """
-        Build index mapping time ranges to file paths
+        Build index mapping time ranges to file paths.
 
         Returns
         -------
@@ -236,40 +235,39 @@ class DataReaderRadklim(DataReaderTimestep):
             List of dicts with 'path', 'start', 'end', 'year', 'month'
         """
         file_index = []
+        
+        # rglob recursively finds all .nc files
+        nc_files = list(self.base_path.rglob("*.nc"))
+        
+        if not nc_files:
+            _logger.warning(f"No .nc files found in {self.base_path}")
+            return []
 
-        # Scan year directories
-        year_dirs = sorted([d for d in self.base_path.iterdir() if d.is_dir() and d.name.isdigit()])
+        _logger.info(f"Building file index for {len(nc_files)} files...")
 
-        for year_dir in year_dirs:
-            # Scan monthly netCDF files
-            nc_files = sorted(year_dir.glob("*.nc"))
+        for nc_file in nc_files:
+            try:
+                with nc.Dataset(nc_file, "r") as ds:
+                    time_var = ds.variables["time"]
+                    
+                    if len(time_var) == 0:
+                        continue
+                        
+                    times = nc.num2date(time_var[:], time_var.units, time_var.calendar)
+                    start_time = times[0]
+                    end_time = times[-1]
 
-            for nc_file in nc_files:
-                try:
-                    # Open file to get time range
-                    with nc.Dataset(nc_file, "r") as ds:
-                        time_var = ds.variables["time"]
-                        times = nc.num2date(time_var[:], time_var.units, time_var.calendar)
+                    file_index.append({
+                        "path": nc_file,
+                        "start": np.datetime64(start_time),
+                        "end": np.datetime64(end_time),
+                        "year": start_time.year,
+                        "month": start_time.month,
+                    })
+            except Exception as e:
+                _logger.warning(f"Could not read file {nc_file} for indexing: {e}")
 
-                        start_time = times[0]
-                        end_time = times[-1]
-
-                        year = start_time.year
-                        month = start_time.month
-
-                        file_index.append(
-                            {
-                                "path": nc_file,
-                                "start": np.datetime64(start_time),
-                                "end": np.datetime64(end_time),
-                                "year": year,
-                                "month": month,
-                            }
-                        )
-                except Exception as e:
-                    _logger.warning(f"Could not read file {nc_file}: {e}")
-                    continue
-
+        # Sort the index chronologically by start time
         return sorted(file_index, key=lambda x: x["start"])
 
     def _load_file_index(self, index_file: Path) -> list[dict]:
