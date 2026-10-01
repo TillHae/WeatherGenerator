@@ -28,6 +28,7 @@ from weathergen.datasets.data_reader_base import (
 )
 from weathergen.datasets.data_reader_obs import DataReaderObs
 from weathergen.datasets.data_reader_radklim import DataReaderRadklim
+from weathergen.datasets.data_reader_icon_dream import DataReaderIconDream
 from weathergen.datasets.masking import Masker
 from weathergen.datasets.stream_data import StreamData, spoof
 from weathergen.datasets.tokenizer_masking import TokenizerMasking
@@ -38,7 +39,7 @@ from weathergen.readers_extra.registry import get_extra_reader
 from weathergen.train.utils import Stage, get_batch_size_from_config
 from weathergen.utils.distributed import is_root
 
-type AnyDataReader = DataReaderBase | DataReaderAnemoi | DataReaderObs
+type AnyDataReader = DataReaderBase | DataReaderAnemoi | DataReaderObs | DataReaderRadklim | DataReaderIconDream
 type StreamName = str
 
 logger = logging.getLogger(__name__)
@@ -240,10 +241,14 @@ Set repeat_data_in_mini_epoch to True if this is undesired."
                     datapath_cfg = cf.get("data_path_obs", None)
                 case "anemoi":
                     dataset = DataReaderAnemoi
+                case "icon_dream":
+                    dataset = DataReaderIconDream
+                case "radklim":
+                    dataset = DataReaderRadklim
                 case type_name:
                     dataset = get_extra_reader(type_name)
                     if dataset is None:
-                        msg = f"Unsupported stream type {stream_info['type']}"
+                        msg = f"Unsupported stream type {stream_info['type']} "
                         f"for stream name '{stream_name}'."
                         raise ValueError(msg)
                     datapath_cfg = None
