@@ -67,29 +67,9 @@ class DataReaderRadklim(DataReaderTimestep):
         if not self.base_path.exists():
             raise FileNotFoundError(f"RADKLIM base path not found: {self.base_path}")
 
-        # Load file index from pre-built config file or build from scratch
-        index_file = stream_info.get("index_file", None)
-
-        if index_file:
-            # Load from pre-built index file in config directory
-            index_path = Path(index_file)
-            if not index_path.is_absolute():
-                # Make path relative to repo root
-                index_path = PROJECT_ROOT / index_path
-
-            if index_path.exists():
-                _logger.info(f"Loading file index from: {index_path}")
-                self.file_index = self._load_file_index(index_path)
-                _logger.info(f"Loaded {len(self.file_index)} files from index")
-            else:
-                raise FileNotFoundError(
-                    f"Index file not found: {index_path}\n"
-                    f"Run 'python build_radklim_index.py' to create it"
-                )
-        else:
-            # Fall back to building index (slower)
-            _logger.info(f"Building file index for RADKLIM data in {self.base_path}")
-            self.file_index = self._build_file_index()
+        # Build index on the fly directly (takes ~2 seconds on HPC)
+        _logger.info(f"Building file index for RADKLIM data in {self.base_path}")
+        self.file_index = self._build_file_index()
 
         if not self.file_index:
             name = stream_info["name"]
@@ -269,37 +249,6 @@ class DataReaderRadklim(DataReaderTimestep):
 
         # Sort the index chronologically by start time
         return sorted(file_index, key=lambda x: x["start"])
-
-    def _load_file_index(self, index_file: Path) -> list[dict]:
-        """
-        Load file index from pre-built JSON file
-
-        Parameters
-        ----------
-        index_file :
-            Path to index file (created by build_radklim_index.py)
-
-        Returns
-        -------
-        file_index :
-            List of dicts with 'path', 'start', 'end', 'year', 'month'
-        """
-        with index_file.open("r") as f:
-            index_data = json.load(f)
-
-        # Convert paths and datetimes
-        file_index = [
-            {
-                "path": self.base_path / entry["path"],  # Relative path from index + base_path
-                "start": np.datetime64(entry["start"]),
-                "end": np.datetime64(entry["end"]),
-                "year": entry["year"],
-                "month": entry["month"],
-            }
-            for entry in index_data.get("files", [])
-        ]
-
-        return file_index
 
     def _get_files_for_time_range(self, start: NPDT64, end: NPDT64) -> list[dict]:
         """
