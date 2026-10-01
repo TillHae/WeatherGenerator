@@ -243,8 +243,10 @@ Set repeat_data_in_mini_epoch to True if this is undesired."
                     dataset = DataReaderAnemoi
                 case "icon_dream":
                     dataset = DataReaderIconDream
+                    datapath_cfg = cf.get("data_path_icon_dream", None)
                 case "radklim":
                     dataset = DataReaderRadklim
+                    datapath_cfg = cf.get("data_path_radklim", None)
                 case type_name:
                     dataset = get_extra_reader(type_name)
                     if dataset is None:
