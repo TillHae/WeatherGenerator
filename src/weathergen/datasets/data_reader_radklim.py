@@ -7,8 +7,11 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
+import hashlib
 import json
 import logging
+import os
+import pickle
 from pathlib import Path
 from typing import override
 
@@ -30,6 +33,26 @@ from weathergen.datasets.data_reader_base import (
 )
 
 _logger = logging.getLogger(__name__)
+
+_INDEX_SCAN_WORKERS = 32
+
+
+def _scan_nc_file(path: Path) -> dict | None:
+    """Read the time range of one RADKLIM file (module level so it can be sent to workers)."""
+    with nc.Dataset(path, "r") as ds:
+        time_var = ds.variables["time"]
+        if len(time_var) == 0:
+            return None
+        times = nc.num2date(time_var[:], time_var.units, time_var.calendar)
+    start_time, end_time = times[0], times[-1]
+    return {
+        "path": path,
+        "start": np.datetime64(start_time),
+        "end": np.datetime64(end_time),
+        "year": start_time.year,
+        "month": start_time.month,
+    }
+
 
 class DataReaderRadklim(DataReaderTimestep):
     """
@@ -209,46 +232,97 @@ class DataReaderRadklim(DataReaderTimestep):
         """
         Build index mapping time ranges to file paths.
 
+        Files are scanned in parallel and the index is cached on disk. The cache is reused as
+        long as the set of netCDF files under base_path is unchanged.
+
         Returns
         -------
         file_index :
             List of dicts with 'path', 'start', 'end', 'year', 'month'
         """
-        file_index = []
-        
         # rglob recursively finds all .nc files
-        nc_files = list(self.base_path.rglob("*.nc"))
-        
+        nc_files = sorted(self.base_path.rglob("*.nc"))
+
         if not nc_files:
             _logger.warning(f"No .nc files found in {self.base_path}")
             return []
 
+        cache_file = self._index_cache_path()
+        file_index = self._load_index_cache(cache_file, nc_files)
+        if file_index is not None:
+            return file_index
+
         _logger.info(f"Building file index for {len(nc_files)} files...")
 
-        for nc_file in nc_files:
-            try:
-                with nc.Dataset(nc_file, "r") as ds:
-                    time_var = ds.variables["time"]
-                    
-                    if len(time_var) == 0:
-                        continue
-                        
-                    times = nc.num2date(time_var[:], time_var.units, time_var.calendar)
-                    start_time = times[0]
-                    end_time = times[-1]
-
-                    file_index.append({
-                        "path": nc_file,
-                        "start": np.datetime64(start_time),
-                        "end": np.datetime64(end_time),
-                        "year": start_time.year,
-                        "month": start_time.month,
-                    })
-            except Exception as e:
-                _logger.warning(f"Could not read file {nc_file} for indexing: {e}")
+        file_index = []
+        # processes instead of threads: netCDF4/HDF5 is not thread-safe
+        n_workers = min(_INDEX_SCAN_WORKERS, os.cpu_count() or 1)
+        with ProcessPoolExecutor(max_workers=n_workers) as executor:
+            futures = {executor.submit(_scan_nc_file, path): path for path in nc_files}
+            for i, future in enumerate(as_completed(futures), start=1):
+                if i % 1000 == 0:
+                    _logger.info(f"Scanned {i}/{len(nc_files)} files...")
+                try:
+                    entry = future.result()
+                except Exception as e:
+                    _logger.warning(f"Could not read file {futures[future]} for indexing: {e}")
+                    continue
+                if entry is not None:
+                    file_index.append(entry)
 
         # Sort the index chronologically by start time
-        return sorted(file_index, key=lambda x: x["start"])
+        file_index.sort(key=lambda x: x["start"])
+
+        self._save_index_cache(cache_file, nc_files, file_index)
+        return file_index
+
+    def _index_cache_path(self) -> Path | None:
+        """Return the cache file for this dataset directory, or None if no cache dir is usable."""
+        xdg = os.environ.get("XDG_CACHE_HOME")
+        cache_dir = (Path(xdg) if xdg else Path.home() / ".cache") / "weathergen"
+        try:
+            cache_dir.mkdir(parents=True, exist_ok=True)
+        except OSError as e:
+            _logger.warning(f"Could not create index cache dir {cache_dir}: {e}")
+            return None
+        # one cache file per dataset directory
+        key = hashlib.sha1(str(self.base_path.resolve()).encode()).hexdigest()[:16]
+        return cache_dir / f"radklim_index_{key}.pkl"
+
+    @staticmethod
+    def _load_index_cache(cache_file: Path | None, nc_files: list[Path]) -> list[dict] | None:
+        """Return the cached index if it was built from exactly nc_files, otherwise None."""
+        if cache_file is None or not cache_file.exists():
+            return None
+        try:
+            with cache_file.open("rb") as f:
+                cached = pickle.load(f)
+        except Exception as e:
+            _logger.warning(f"Failed to load index cache {cache_file} ({e}), rebuilding.")
+            return None
+        if not isinstance(cached, dict) or cached.get("files") != nc_files:
+            _logger.info(f"Index cache {cache_file} is outdated, rebuilding.")
+            return None
+        _logger.info(f"Loaded cached file index from {cache_file}")
+        return cached["index"]
+
+    @staticmethod
+    def _save_index_cache(
+        cache_file: Path | None, nc_files: list[Path], file_index: list[dict]
+    ) -> None:
+        """Write the index cache atomically, so concurrent ranks never read a partial file."""
+        if cache_file is None:
+            return
+        tmp_file = cache_file.with_suffix(f".{os.getpid()}.tmp")
+        try:
+            with tmp_file.open("wb") as f:
+                pickle.dump({"files": nc_files, "index": file_index}, f)
+            tmp_file.replace(cache_file)
+        except (OSError, pickle.PicklingError) as e:
+            _logger.warning(f"Failed to save index cache {cache_file}: {e}")
+            tmp_file.unlink(missing_ok=True)
+            return
+        _logger.info(f"Saved file index cache to {cache_file}")
 
     def _get_files_for_time_range(self, start: NPDT64, end: NPDT64) -> list[dict]:
         """
