@@ -95,6 +95,10 @@ norm_type: "LayerNorm"
 streams_directory: "./config/streams/e3_germany_radklim/"
 streams: ???
 
+# base directories for streams with empty filenames (ICON_DREAM, RADKLIM)
+data_path_icon_dream: "/p/scratch/hclimrep/wahl2/ICON-DREAM"
+data_path_radklim: "/p/data1/slmet/met_data/dwd/radklim-rw/netcdf/orig_grid"
+
 zarr_store: "zip"
 
 general:
