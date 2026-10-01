@@ -66,7 +66,7 @@ def write_output(
             # handle spoof data: do not write since it might corrupt validation (spoofing invisible
             # there)
             if target_aux_out.physical[t_idx][sname]["is_spoof"][0]:
-            targets = target_aux_out.physical[t_idx][sname]["target"]
+                targets = target_aux_out.physical[t_idx][sname]["target"]
                 # for-loop to make sure we have a consistent number of samples
                 preds_s = [np.zeros((1, 0, t.shape[1])) for t in targets]
                 targets_s = [np.zeros((0, t.shape[1])) for t in targets]

@@ -470,20 +470,15 @@ class LossPhysical(LossModuleBase):
         # still produces a meaningful diagnostic average rather than propagating NaN.
         for stream_name, lfct_dict in reordered_losses.items():
             for loss_fct_name, ch_dict in lfct_dict.items():
-                total = 0
+                reordered_losses[stream_name][loss_fct_name]["avg"] = 0
                 count = 0
                 for ch_n, output_step_dict in ch_dict.items():
                     if ch_n != "avg":
                         for _, v in output_step_dict.items():
-                        is_nan = (
-                            isinstance(v, float) and (v != v or np.isnan(v))
-                        ) or (
-                            isinstance(v, torch.Tensor) and torch.isnan(v).item()
-                        )
-                        v = 0.0 if is_nan else v
-                        reordered_losses[stream_name][loss_fct_name]["avg"] += v
-                        count += 1
-            reordered_losses[stream_name][loss_fct_name]["avg"] /= count
+                            v = 0.0 if type(v) is float and np.isnan(v) else v
+                            reordered_losses[stream_name][loss_fct_name]["avg"] += v
+                            count += 1
+                reordered_losses[stream_name][loss_fct_name]["avg"] /= count
 
         # Return all computed loss components encapsulated in a ModelLoss dataclass
         return LossValues(loss=loss, losses_all=reordered_losses, stddev_all=None)

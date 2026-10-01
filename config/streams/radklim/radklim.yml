@@ -12,6 +12,10 @@ RADKLIM:
   filenames: ['']  # Leave empty or use '.' - base_path from config will be used directly
   source: ['RR']  # RR is the netCDF variable name for hourly rainfall
   target: ['RR']
+  spatial_stride: 4
+  calc_stats: False
+  mean: 0.1234
+  stdev: 1.4567 
   source_exclude: []
   target_exclude: []
   frequency: "01:00:00"  # 1 hour
