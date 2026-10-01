@@ -115,6 +115,12 @@ class LossPhysical(LossModuleBase):
         # supports optional "args" dict for passing extra kwargs to loss functions
         self.loss_fcts = self._parse_loss_fcts(loss_fcts)
 
+        self.dynamic_loss_ema = DynamicLossEMA(
+            self.dynamic_loss_cfg if self.stage == TRAIN else None,
+            self.cf.streams,
+            self.device,
+        )
+
     @staticmethod
     def _parse_loss_fcts(loss_fcts_dict: dict) -> list:
         """Parse a loss_fcts config dict into a list of [fn, weight, name] triples."""
@@ -128,12 +134,6 @@ class LossPhysical(LossModuleBase):
                 loss_fn = functools.partial(loss_fn, **extra_args)
             result.append([loss_fn, params.get("weight", 1.0), name])
         return result
-
-        self.dynamic_loss_ema = DynamicLossEMA(
-            self.dynamic_loss_cfg if self.stage == TRAIN else None,
-            self.cf.streams,
-            self.device,
-        )
 
     def _get_weights(self, stream_name, stream_info):
         """

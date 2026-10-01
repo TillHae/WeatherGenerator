@@ -35,11 +35,20 @@ from weathergen.datasets.data_reader_base import (
 _logger = logging.getLogger(__name__)
 
 _INDEX_SCAN_WORKERS = 32
+# bump when the index format or the file selection changes, to invalidate old caches
+_INDEX_CACHE_VERSION = 2
 
 
 def _scan_nc_file(path: Path) -> dict | None:
-    """Read the time range of one RADKLIM file (module level so it can be sent to workers)."""
+    """
+    Read the time range of one RADKLIM file (module level so it can be sent to workers).
+
+    Returns None for files without time steps or without the RR variable, e.g. other
+    products stored in the same directory tree.
+    """
     with nc.Dataset(path, "r") as ds:
+        if "RR" not in ds.variables:
+            return None
         time_var = ds.variables["time"]
         if len(time_var) == 0:
             return None
@@ -270,6 +279,10 @@ class DataReaderRadklim(DataReaderTimestep):
                 if entry is not None:
                     file_index.append(entry)
 
+        n_skipped = len(nc_files) - len(file_index)
+        if n_skipped > 0:
+            _logger.info(f"Skipped {n_skipped} files without RR data or time steps.")
+
         # Sort the index chronologically by start time
         file_index.sort(key=lambda x: x["start"])
 
@@ -300,7 +313,11 @@ class DataReaderRadklim(DataReaderTimestep):
         except Exception as e:
             _logger.warning(f"Failed to load index cache {cache_file} ({e}), rebuilding.")
             return None
-        if not isinstance(cached, dict) or cached.get("files") != nc_files:
+        if (
+            not isinstance(cached, dict)
+            or cached.get("version") != _INDEX_CACHE_VERSION
+            or cached.get("files") != nc_files
+        ):
             _logger.info(f"Index cache {cache_file} is outdated, rebuilding.")
             return None
         _logger.info(f"Loaded cached file index from {cache_file}")
@@ -316,7 +333,9 @@ class DataReaderRadklim(DataReaderTimestep):
         tmp_file = cache_file.with_suffix(f".{os.getpid()}.tmp")
         try:
             with tmp_file.open("wb") as f:
-                pickle.dump({"files": nc_files, "index": file_index}, f)
+                pickle.dump(
+                    {"version": _INDEX_CACHE_VERSION, "files": nc_files, "index": file_index}, f
+                )
             tmp_file.replace(cache_file)
         except (OSError, pickle.PicklingError) as e:
             _logger.warning(f"Failed to save index cache {cache_file}: {e}")
