@@ -56,27 +56,6 @@ _SURFACE_INSTANT = (
 # Accumulated total precipitation: 3h window, valid at end of accumulation.
 _TP = ("tp", 0, "3")
 
-
-def _build_channels() -> tuple[list[str], dict[str, tuple[str, int, str]]]:
-    """Return (ordered channel names, channel_name -> (shortName, level, endStep) spec)."""
-    names: list[str] = []
-    spec: dict[str, tuple[str, int, str]] = {}
-    for sn, lev, es in _SURFACE_INSTANT:
-        names.append(sn)
-        spec[sn] = (sn, lev, es)
-    names.append(_TP[0])
-    spec[_TP[0]] = (_TP[0], _TP[1], _TP[2])
-    for var in _ML_VARS:
-        for lev in ICON_DREAM_MODEL_LEVELS:
-            ch = f"{var}_L{lev:03d}"
-            names.append(ch)
-            spec[ch] = (var, lev, "0s")
-    return names, spec
-
-
-ICON_DREAM_CHANNELS, ICON_DREAM_CHANNEL_SPEC = _build_channels()
-
-
 # Reasonable normalisation defaults per variable family (mean, stdev).
 # Can be overridden per channel via stream_info["normalization"].
 _DEFAULT_NORM: dict[str, tuple[float, float]] = {
@@ -92,6 +71,25 @@ _DEFAULT_NORM: dict[str, tuple[float, float]] = {
     "v": (0.0, 12.0),
     "pres": (50000.0, 30000.0),
 }
+
+
+def _build_channels() -> dict[str, tuple[str, int, str]]:
+    """Return (channel_name -> (shortName, level, endStep) spec)."""
+    spec: dict[str, tuple[str, int, str]] = {}
+    for sn, lev, es in _SURFACE_INSTANT:
+        spec[sn] = (sn, lev, es)
+
+    spec[_TP[0]] = _TP
+    for var in _ML_VARS:
+        for lev in ICON_DREAM_MODEL_LEVELS:
+            ch = f"{var}_L{lev:03d}"
+            spec[ch] = (var, lev, "0s")
+
+    return spec
+
+
+ICON_DREAM_CHANNEL_SPEC = _build_channels()
+ICON_DREAM_CHANNELS = list(ICON_DREAM_CHANNEL_SPEC.keys())
 
 
 def _channel_default_norm(ch: str) -> tuple[float, float]:
@@ -139,7 +137,7 @@ class DataReaderIconDream(DataReaderTimestep):
     """
 
     # Default in-memory LRU bound for offset caches (overridable per stream).
-    _DEFAULT_MAX_CACHED_FILES: int = 512
+    _DEFAULT_MAX_CACHED_FILES: int = 4096
     # Default number of decoder threads (overridable per stream).
     _DEFAULT_PARALLEL_READS: int = 4
     # Threshold below which parallel dispatch overhead isn't worth it.
@@ -156,17 +154,8 @@ class DataReaderIconDream(DataReaderTimestep):
         if not self.base_path.exists():
             raise FileNotFoundError(f"ICON-DREAM base path not found: {self.base_path}")
 
-        # Locate the const/extpar file (used for lat/lon and optional geoinfo).
-        const_dir = stream_info.get("const_path")
-        const_dir = Path(const_dir) if const_dir else (self.base_path / "const")
-        extpar_filename = stream_info.get(
-            "extpar_file", "icon_extpar_0026_R03B07_G_20220601_tiles.nc"
-        )
-        self._extpar_path = const_dir / extpar_filename
-
         # Build the daily file index from filenames only (fast, no GRIB opening).
         self.file_index: list[dict] = self._build_file_index()
-
         if not self.file_index:
             name = stream_info["name"]
             _logger.warning(
@@ -185,10 +174,6 @@ class DataReaderIconDream(DataReaderTimestep):
         data_end_time = self.file_index[-1]["end"]
         period = ICON_DREAM_PERIOD
 
-        # Load lat/lon and apply spatial subsampling.
-        self._load_coordinates(self._extpar_path)
-        self._apply_spatial_filters(stream_info)
-
         # Initialise the timestep base class with discovered temporal extent.
         super().__init__(tw_handler, stream_info, data_start_time, data_end_time, period)
 
@@ -204,6 +189,30 @@ class DataReaderIconDream(DataReaderTimestep):
         # Total 3-hourly steps from data_start to data_end inclusive.
         self.len = int((data_end_time - data_start_time) / period) + 1
 
+        self._init_spatial_data(stream_info)
+        self._init_channels_and_norms(stream_info)
+        self._init_cache_and_perf_options(stream_info)
+        self._log_init_summary(stream_info, data_start_time, data_end_time, period)
+
+    def _init_spatial_data(self, stream_info: dict) -> None:
+        """Locate the const/extpar file, load coordinates/filters, and load static geoinfo."""
+        const_dir = stream_info.get("const_path")
+        const_dir = Path(const_dir) if const_dir else (self.base_path / "const")
+        extpar_filename = stream_info.get(
+            "extpar_file", "icon_extpar_0026_R03B07_G_20220601_tiles.nc"
+        )
+        self._extpar_path = const_dir / extpar_filename
+
+        # Load lat/lon and apply spatial subsampling.
+        self._load_coordinates(self._extpar_path)
+        self._apply_spatial_filters(stream_info)
+
+        # Static geoinfo from extpar (e.g. topography, land fraction).
+        geoinfo_names = list(stream_info.get("geoinfo_channels", []) or [])
+        self._load_geoinfo(geoinfo_names)
+
+    def _init_channels_and_norms(self, stream_info: dict) -> None:
+        """Configure source/target channels, normalisation stats, and channel weights."""
         # Channel selection (uses substring-match semantics, like the other readers).
         available = ICON_DREAM_CHANNELS
         s_chs = stream_info.get("source")
@@ -223,12 +232,9 @@ class DataReaderIconDream(DataReaderTimestep):
         )
 
         # Normalisation arrays cover ALL channels so source_idx/target_idx index in.
-        norm_means = np.array(
-            [_channel_default_norm(ch)[0] for ch in available], dtype=np.float32
-        )
-        norm_stdevs = np.array(
-            [_channel_default_norm(ch)[1] for ch in available], dtype=np.float32
-        )
+        norm_means, norm_stdevs = np.array(
+            [_channel_default_norm(ch) for ch in available], dtype=np.float32
+        ).T
         for ch, ms in (stream_info.get("normalization") or {}).items():
             if ch in available:
                 i = available.index(ch)
@@ -237,13 +243,11 @@ class DataReaderIconDream(DataReaderTimestep):
         self.mean = norm_means
         self.stdev = norm_stdevs
 
-        # Static geoinfo from extpar (e.g. topography, land fraction).
-        geoinfo_names = list(stream_info.get("geoinfo_channels", []) or [])
-        self._load_geoinfo(geoinfo_names)
-
         self.target_channel_weights = self.parse_target_channel_weights()
         self.properties = {"stream_id": stream_info.get("stream_id", 0)}
 
+    def _init_cache_and_perf_options(self, stream_info: dict) -> None:
+        """Initialise offset caching and parallel decode configuration."""
         # ---- Performance knobs (see class docstring) ----
         self._max_cached_files: int = int(
             stream_info.get("offset_cache_size", self._DEFAULT_MAX_CACHED_FILES)
@@ -276,6 +280,13 @@ class DataReaderIconDream(DataReaderTimestep):
             )
             self._index_dir = None
 
+    def _log_init_summary(
+        self,
+        stream_info: dict,
+        data_start_time: NPDT64,
+        data_end_time: NPDT64,
+        period: np.timedelta64,
+    ) -> None:
         ds_name = stream_info["name"]
         _logger.info(f"{ds_name}: source channels: {self.source_channels}")
         _logger.info(f"{ds_name}: target channels: {self.target_channels}")
