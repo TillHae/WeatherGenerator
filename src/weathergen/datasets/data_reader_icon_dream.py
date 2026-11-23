@@ -34,6 +34,7 @@ from weathergen.datasets.data_reader_base import (
 
 _logger = logging.getLogger(__name__)
 
+# ---------- Default values when statistics aren't stored ----------
 
 # ICON model-level indices available in the dataset (out of 120 total)
 ICON_DREAM_MODEL_LEVELS: list[int] = [49, 57, 64, 70, 75, 79, 86, 91, 96, 101, 108, 112, 119]
@@ -96,6 +97,7 @@ ICON_DREAM_CHANNELS = list(ICON_DREAM_CHANNEL_SPEC.keys())
 def _channel_default_norm(ch: str) -> tuple[float, float]:
     if ch in _DEFAULT_NORM:
         return _DEFAULT_NORM[ch]
+
     family = ch.split("_L")[0]
     return _DEFAULT_NORM.get(family, (0.0, 1.0))
 
@@ -155,7 +157,7 @@ class DataReaderIconDream(DataReaderTimestep):
         if not self.base_path.exists():
             raise FileNotFoundError(f"ICON-DREAM base path not found: {self.base_path}")
 
-        # Build the daily file index from filenames only (fast, no GRIB opening).
+        # Build the daily file index from filenames only
         self.file_index: list[dict] = self._build_file_index()
         if not self.file_index:
             name = stream_info["name"]
@@ -166,7 +168,7 @@ class DataReaderIconDream(DataReaderTimestep):
             self.init_empty()
             return
 
-        # Map date -> file path (used for fast lookup in _get).
+        # Map date -> file path
         self._date_to_path: dict[np.datetime64, Path] = {
             entry["date"]: entry["path"] for entry in self.file_index
         }
@@ -175,10 +177,10 @@ class DataReaderIconDream(DataReaderTimestep):
         data_end_time = self.file_index[-1]["end"]
         period = ICON_DREAM_PERIOD
 
-        # Initialise the timestep base class with discovered temporal extent.
+        # Initialise the timestep base class with discovered temporal extent
         super().__init__(tw_handler, stream_info, data_start_time, data_end_time, period)
 
-        # Bail out if requested training window has no overlap.
+        # Bail out if requested training window has no overlap
         if tw_handler.t_start >= data_end_time or tw_handler.t_end <= data_start_time:
             name = stream_info["name"]
             _logger.warning(
@@ -187,7 +189,7 @@ class DataReaderIconDream(DataReaderTimestep):
             self.init_empty()
             return
 
-        # Total 3-hourly steps from data_start to data_end inclusive.
+        # Total 3-hourly steps from data_start to data_end inclusive
         self.len = int((data_end_time - data_start_time) / period) + 1
 
         self._init_spatial_data(stream_info)
@@ -204,17 +206,16 @@ class DataReaderIconDream(DataReaderTimestep):
         )
         self._extpar_path = const_dir / extpar_filename
 
-        # Load lat/lon and apply spatial subsampling.
+        # Load lat/lon and apply spatial subsampling
         self._load_coordinates(self._extpar_path)
         self._apply_spatial_filters(stream_info)
 
-        # Static geoinfo from extpar (e.g. topography, land fraction).
         geoinfo_names = list(stream_info.get("geoinfo_channels", []) or [])
         self._load_geoinfo(geoinfo_names)
 
     def _init_channels_and_norms(self, stream_info: dict) -> None:
         """Configure source/target channels, normalisation stats, and channel weights."""
-        # Channel selection (uses substring-match semantics, like the other readers).
+        # Channel selection
         available = ICON_DREAM_CHANNELS
         s_chs = stream_info.get("source")
         s_chs_exclude = stream_info.get("source_exclude", [])
@@ -282,8 +283,10 @@ class DataReaderIconDream(DataReaderTimestep):
             ch_stats = statistics.get(ch)
             if not isinstance(ch_stats, dict):
                 continue
+
             if ch_stats.get("mean") is not None:
                 norm_means[i] = float(ch_stats["mean"])
+
             if ch_stats.get("stdev") is not None:
                 std_val = float(ch_stats["stdev"])
                 if std_val > 0:
@@ -301,6 +304,7 @@ class DataReaderIconDream(DataReaderTimestep):
                     msg = eccodes.codes_grib_new_from_file(f)
                     if msg is None:
                         break
+
                     try:
                         sn = eccodes.codes_get(msg, "shortName")
                         lev = int(eccodes.codes_get(msg, "level"))
@@ -428,6 +432,7 @@ class DataReaderIconDream(DataReaderTimestep):
                 if xdg
                 else Path.home() / ".cache" / "weathergen" / "icon_dream_index"
             )
+
         self._index_dir: Path | None = Path(idx_dir)
         try:
             self._index_dir.mkdir(parents=True, exist_ok=True)
@@ -483,10 +488,12 @@ class DataReaderIconDream(DataReaderTimestep):
             date_str = fpath.name.rsplit(".", 1)[-1]
             if len(date_str) != 8 or not date_str.isdigit():
                 continue
+
             try:
                 file_date = datetime.datetime.strptime(date_str, "%Y%m%d")
             except ValueError:
                 continue
+
             start_dt = np.datetime64(file_date).astype("datetime64[ns]")
             end_dt = start_dt + np.timedelta64(21, "h")
             index.append(
@@ -503,6 +510,7 @@ class DataReaderIconDream(DataReaderTimestep):
         try:
             with open(cache_file, "wb") as f:
                 pickle.dump(index, f)
+
             _logger.info(f"Saved ICON-DREAM file index cache to {cache_file}")
         except Exception as e:
             _logger.warning(f"Failed to save index cache: {e}")
@@ -513,10 +521,12 @@ class DataReaderIconDream(DataReaderTimestep):
         """Read cell-centre lat/lon from the ICON extpar NetCDF file."""
         if not extpar_path.exists():
             raise FileNotFoundError(f"ICON extpar file not found: {extpar_path}")
+
         _logger.info(f"Loading coordinates from {extpar_path}")
         with nc.Dataset(extpar_path, "r") as ds:
             self.latitudes_full = ds.variables["lat"][:].astype(np.float32)
             self.longitudes_full = ds.variables["lon"][:].astype(np.float32)
+
         _logger.info(f"Loaded {len(self.latitudes_full):,} grid cells from extpar")
 
     def _apply_spatial_filters(self, stream_info: dict) -> None:
@@ -570,12 +580,14 @@ class DataReaderIconDream(DataReaderTimestep):
                 if v not in ds.variables:
                     _logger.warning(f"Geoinfo variable '{v}' not in extpar file; skipping")
                     continue
+
                 arr = ds.variables[v][:]
                 if arr.ndim != 1 or arr.shape[0] != len(self.latitudes_full):
                     _logger.warning(
                         f"Geoinfo variable '{v}' has incompatible shape {arr.shape}; skipping"
                     )
                     continue
+
                 arrays.append(arr.astype(np.float32))
                 kept.append(v)
 
@@ -611,6 +623,7 @@ class DataReaderIconDream(DataReaderTimestep):
                 msg = eccodes.codes_grib_new_from_file(f)
                 if msg is None:
                     break
+
                 try:
                     sn = eccodes.codes_get(msg, "shortName")
                     lev = int(eccodes.codes_get(msg, "level"))
@@ -621,12 +634,14 @@ class DataReaderIconDream(DataReaderTimestep):
                     _logger.warning(f"Skipping malformed message in {file_path}: {e}")
                 finally:
                     eccodes.codes_release(msg)
+
         return cache
 
     def _index_file_path(self, file_path: Path) -> Path | None:
         """Per-GRIB-file location of the persisted offset cache."""
         if self._index_dir is None:
             return None
+
         return self._index_dir / f"{file_path.name}.idx.json"
 
     def _load_offset_cache_from_disk(
@@ -636,12 +651,15 @@ class DataReaderIconDream(DataReaderTimestep):
         idx_file = self._index_file_path(file_path)
         if idx_file is None or not idx_file.exists():
             return None
+
         try:
             if idx_file.stat().st_mtime < file_path.stat().st_mtime:
                 # GRIB file modified since the index was written — rebuild.
                 return None
+
             with idx_file.open("r") as f:
                 raw = json.load(f)
+
             return {
                 (int(dt), sn, int(lev), str(es)): int(off)
                 for dt, sn, lev, es, off in raw
@@ -657,6 +675,7 @@ class DataReaderIconDream(DataReaderTimestep):
         idx_file = self._index_file_path(file_path)
         if idx_file is None:
             return
+
         tmp = idx_file.with_suffix(idx_file.suffix + ".tmp")
         try:
             with tmp.open("w") as f:
@@ -664,6 +683,7 @@ class DataReaderIconDream(DataReaderTimestep):
                     [[dt, sn, lev, es, off] for (dt, sn, lev, es), off in cache.items()],
                     f,
                 )
+
             tmp.replace(idx_file)
         except OSError as e:
             _logger.warning(f"Failed to persist offset cache for {file_path}: {e}")
@@ -683,24 +703,29 @@ class DataReaderIconDream(DataReaderTimestep):
         if cache is not None:
             self._offset_cache.move_to_end(file_path)
             return cache
+
         cache = self._load_offset_cache_from_disk(file_path)
         if cache is None:
             cache = self._build_offset_cache(file_path)
             self._save_offset_cache_to_disk(file_path, cache)
+
         self._offset_cache[file_path] = cache
         while len(self._offset_cache) > self._max_cached_files:
             self._offset_cache.popitem(last=False)
+
         return cache
 
     def _ensure_executor(self) -> ThreadPoolExecutor | None:
         """Lazily create the decode thread pool (returns None when disabled)."""
         if self._parallel_reads <= 1:
             return None
+
         if self._executor is None:
             self._executor = ThreadPoolExecutor(
                 max_workers=self._parallel_reads,
                 thread_name_prefix=f"icon_dream_decode_{id(self)}",
             )
+
         return self._executor
 
     def _read_file_requests(
@@ -723,6 +748,7 @@ class DataReaderIconDream(DataReaderTimestep):
                 if msg is None:
                     _logger.warning(f"Null message at offset {offset} in {file_path}")
                     continue
+
                 try:
                     values = eccodes.codes_get_array(msg, "values")
                     # Direct assignment auto-casts float64 -> float32 (data_buf is f32).
@@ -745,15 +771,18 @@ class DataReaderIconDream(DataReaderTimestep):
         file_path = self._date_to_path.get(file_date)
         if file_path is None:
             return None
+
         vt_dt = valid_time.astype("datetime64[s]").astype(datetime.datetime)
         if end_step == "3":
             # tp: GRIB dataTime is (valid_time - 3h)'s hour, mod 24.
             data_time = ((vt_dt.hour - 3) % 24) * 100
         else:
             data_time = vt_dt.hour * 100
+
         offset = self._get_offset_cache(file_path).get((data_time, short_name, level, end_step))
         if offset is None:
             return None
+
         return file_path, offset
 
     # ------------------------------------------------------------------
@@ -790,6 +819,7 @@ class DataReaderIconDream(DataReaderTimestep):
         """Filter channel names by include/exclude substring patterns."""
         if cols_select is not None and len(cols_select) == 0:
             return []
+
         return [
             c
             for c in colnames
@@ -835,6 +865,7 @@ class DataReaderIconDream(DataReaderTimestep):
                 loc = self._locate_message(vt, ch)
                 if loc is None:
                     continue
+
                 fpath, offset = loc
                 requests_by_file.setdefault(fpath, []).append((ti, ci, offset))
 
@@ -866,6 +897,7 @@ class DataReaderIconDream(DataReaderTimestep):
                             data_buf,
                         )
                     )
+                    
             for fut in futures:
                 fut.result()
 
